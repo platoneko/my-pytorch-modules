@@ -26,7 +26,7 @@ class GRUEncoder(nn.Module):
                  num_layers=1,
                  bidirectional=True,
                  dropout=0.0):
-        super(GRUEncoder, self).__init__()
+        super().__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
