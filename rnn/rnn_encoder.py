@@ -127,15 +127,15 @@ class LSTMEncoder(nn.Module):
                            dropout=self.dropout if self.num_layers > 1 else 0,
                            bidirectional=self.bidirectional)
 
-    def forward(self, inputs, hidden=None, cell_state=None):
+    def forward(self, inputs, hidden_tuple=None):
         """
         forward
 
         :param
             inputs (tensor, tuple): input tensor, or tuple containing input tensor and lengths.
-            hidden (tensor):
-                of shape (num_layers * num_directions, batch, hidden_size),
-                containing the initial hidden state for each element in the batch.
+            hidden_tuple (tuple):
+                tuple of 2 tensor of shape (num_layers * num_directions, batch, hidden_size),
+                containing the initial hidden state and initial cell state for each element in the batch.
 
         :return
             outputs (tensor): of shape (batch, length, hidden_size * num_directions).
@@ -160,12 +160,13 @@ class LSTMEncoder(nn.Module):
                 sorted_lengths[:num_valid].tolist(),
                 batch_first=True)
 
-            if hidden is not None:
+            if hidden_tuple is not None:
+                hidden, cell_state = hidden_tuple
                 hidden = hidden.index_select(1, indices)[:, :num_valid]
-            if cell_state is not None:
                 cell_state = cell_state.index_select(1, indices)[:, :num_valid]
+                hidden_tuple = (hidden, cell_state)
 
-        outputs, (last_hidden, last_cell_state) = self.rnn(rnn_inputs, (hidden, cell_state))
+        outputs, (last_hidden, last_cell_state) = self.rnn(rnn_inputs, hidden_tuple)
 
         if self.bidirectional:
             last_hidden = _bridge_bidirectional_hidden(last_hidden)
@@ -192,4 +193,4 @@ class LSTMEncoder(nn.Module):
             last_hidden = last_hidden.index_select(1, inv_indices)
             last_cell_state = last_cell_state.index_select(1, inv_indices)
 
-        return outputs, last_hidden, last_cell_state
+        return outputs, (last_hidden, last_cell_state)
