@@ -20,11 +20,11 @@ def masked_softmax(vector, mask, dim=-1,
     return result
 
 
-def sequence_cross_entropy_with_logits(logits: torch.FloatTensor,
-                                       targets: torch.LongTensor,
-                                       weights: torch.FloatTensor,
-                                       average: str = "batch",
-                                       label_smoothing: float = None) -> torch.FloatTensor:
+def sequence_cross_entropy_with_logits(logits,
+                                       targets,
+                                       weights,
+                                       average="batch",
+                                       label_smoothing=None):
     """
     Computes the cross entropy loss of a sequence, weighted with respect to
     some user provided weights. Note that the weighting here is not the same as
