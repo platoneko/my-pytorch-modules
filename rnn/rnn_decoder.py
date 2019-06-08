@@ -23,8 +23,6 @@ class GRUDecoder(nn.Module):
         self.start_index = start_index
         self.embedder = embedder
         self.attention = attention
-        self.num_layers = num_layers
-        self.dropout = dropout
         self.num_steps = num_steps
         self.rnn_input_size = self.input_size
 
