@@ -1,10 +1,14 @@
 """
-inputs:
-    query: of shape (batch, query_size)
-    value: of shape (batch, num_rows, value_size)
-    mask: of shape (batch, num_rows)
-outputs:
-    score: of shape (batch, num_rows)
+:inputs
+    query : ``torch.FloatTensor``, required.
+        A ``torch.FloatTensor`` of shape (batch, query_size)
+    value : ``torch.FloatTensor``, required.
+        A ``torch.FloatTensor`` of shape (batch, num_rows, value_size)
+    mask : ``torch.LongTensor``, required.
+        A ``torch.LongTensor`` of shape (batch, num_rows)
+:outputs
+    score : ``torch.FloatTensor``
+        Normalized attention score, a ``torch.FloatTensor`` of shape (batch, num_rows)
 """
 
 import torch
@@ -17,6 +21,7 @@ class BilinearAttention(nn.Module):
     """
     score = tanh(x^T W y + b)
     """
+
     def __init__(self, query_size, value_size):
         super().__init__()
         self._weight_matrix = Parameter(torch.Tensor(query_size, value_size))
@@ -60,6 +65,7 @@ class MLPAttention(nn.Module):
     """
     score = tanh(x^T W1 + y^T W2 + b) W
     """
+
     def __init__(self, query_size, value_size, hidden_size):
         super().__init__()
         self.linear_query = nn.Linear(query_size, hidden_size, bias=True)

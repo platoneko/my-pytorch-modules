@@ -49,16 +49,23 @@ class GRUDecoder(nn.Module):
         forward
 
         :param
-            hidden (tensor): init hidden tensor of shape (batch_size, hidden_size)
-            target (tensor): target tokens tensor of shape (batch_size, length)
-            attn_value (tensor): of shape (batch_size, num_rows, value_size)
-            attn_mask (tensor): of shape (batch_size, num_rows)
-            train (bool): train stage or not
-            teaching_force_rate (float)
+        hidden : ``torch.FloatTensor``, required.
+            Initial hidden tensor of shape (batch_size, hidden_size)
+        target : ``torch.LongTensor``, optional (default = None)
+            Target tokens tensor of shape (batch_size, length)
+        attn_value : ``torch.FloatTensor``, optional (default = None)
+            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
+        attn_mask : ``torch.LongTensor``, optional (default = None)
+            A ``torch.LongTensor`` of shape (batch_size, num_rows)
+        train : ``bool``, optional (default = False)
+            Train stage or not.
+        teaching_force_rate : ``float``, optional (default = 0.0)
 
         :return
-            probabilities (tensor): of shape (batch_size, num_steps, num_classes)
-            predictions (tensor): of shape (batch_size, num_steps)
+        probabilities : ``torch.FloatTensor``
+            A ``torch.FloatTensor`` of shape (batch_size, num_steps, num_classes)
+        predictions : ``torch.LongTensor``
+            Predicted target tokens tensor of shape (batch_size, num_steps)
         """
         if self.attention is not None:
             assert attn_value is not None
@@ -114,20 +121,24 @@ class GRUDecoder(nn.Module):
         Decoder forward using beam search at inference stage
 
         :param
-            hidden (tensor): init hidden tensor of shape (batch_size, hidden_size)
-            end_index (int): <eos> index
-            attn_value (tensor): of shape (batch_size, num_rows, value_size)
-            attn_mask (tensor): of shape (batch_size, num_rows)
-            beam_size (int): The width of the beam used.
-            per_node_beam_size (int):
-                The maximum number of candidates to consider per node,
-                at each step in the search.
+        hidden : ``torch.FloatTensor``, required.
+            Initial hidden tensor of shape (batch_size, hidden_size)
+        end_index : ``int``, required.
+            Vocab index of <eos> token.
+        attn_value : ``torch.FloatTensor``, optional (default = None)
+            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
+        attn_mask : ``torch.LongTensor``, optional (default = None)
+            A ``torch.LongTensor`` of shape (batch_size, num_rows)
+        beam_size : ``int``, optional (default = 4)
+        per_node_beam_size : ``int``, optional (default = 4)
 
         :return
-            all_top_k_predictions (tensor):
-                Tensor of shape (batch_size, beam_size, num_steps),
-                containing k top sequences in descending order along dim 1.
-            log_probabilities (tensor): of shape (batch_size, beam_size)
+        all_top_k_predictions : ``torch.LongTensor``
+            A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
+            containing k top sequences in descending order along dim 1.
+        log_probabilities : ``torch.FloatTensor``
+            A ``torch.FloatTensor``  of shape (batch_size, beam_size),
+            Log probabilities of k top sequences.
         """
 
         if self.attention is not None:
@@ -213,16 +224,23 @@ class LSTMDecoder(nn.Module):
         forward
 
         :param
-            hidden (tensor): init hidden tensor of shape (batch_size, hidden_size)
-            target (tensor): target tokens tensor of shape (batch_size, length)
-            attn_value (tensor): of shape (batch_size, num_rows, value_size)
-            attn_mask (tensor): of shape (batch_size, num_rows)
-            train (bool): train stage or not
-            teaching_force_rate (float)
+        hidden : ``torch.FloatTensor``, required.
+            Initial hidden tensor of shape (batch_size, hidden_size)
+        target : ``torch.LongTensor``, optional (default = None)
+            Target tokens tensor of shape (batch_size, length)
+        attn_value : ``torch.FloatTensor``, optional (default = None)
+            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
+        attn_mask : ``torch.LongTensor``, optional (default = None)
+            A ``torch.LongTensor`` of shape (batch_size, num_rows)
+        train : ``bool``, optional (default = False)
+            Train stage or not.
+        teaching_force_rate : ``float``, optional (default = 0.0)
 
         :return
-            probabilities (tensor): of shape (batch_size, num_steps, num_classes)
-            predictions (tensor): of shape (batch_size, num_steps)
+        probabilities : ``torch.FloatTensor``
+            A ``torch.FloatTensor`` of shape (batch_size, num_steps, num_classes)
+        predictions : ``torch.LongTensor``
+            Predicted target tokens tensor of shape (batch_size, num_steps)
         """
         if self.attention is not None:
             assert attn_value is not None
@@ -281,22 +299,25 @@ class LSTMDecoder(nn.Module):
         Decoder forward using beam search at inference stage
 
         :param
-            hidden (tensor): init hidden tensor of shape (batch_size, hidden_size)
-            end_index (int): <eos> index
-            attn_value (tensor): of shape (batch_size, num_rows, value_size)
-            attn_mask (tensor): of shape (batch_size, num_rows)
-            beam_size (int): The width of the beam used.
-            per_node_beam_size (int):
-                The maximum number of candidates to consider per node,
-                at each step in the search.
+        hidden : ``torch.FloatTensor``, required.
+            Initial hidden tensor of shape (batch_size, hidden_size)
+        end_index : ``int``, required.
+            Vocab index of <eos> token.
+        attn_value : ``torch.FloatTensor``, optional (default = None)
+            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
+        attn_mask : ``torch.LongTensor``, optional (default = None)
+            A ``torch.LongTensor`` of shape (batch_size, num_rows)
+        beam_size : ``int``, optional (default = 4)
+        per_node_beam_size : ``int``, optional (default = 4)
 
         :return
-            all_top_k_predictions (tensor):
-                Tensor of shape (batch_size, beam_size, num_steps),
-                containing k top sequences in descending order along dim 1.
-            log_probabilities (tensor): of shape (batch_size, beam_size)
+        all_top_k_predictions : ``torch.LongTensor``
+            A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
+            containing k top sequences in descending order along dim 1.
+        log_probabilities : ``torch.FloatTensor``
+            A ``torch.FloatTensor``  of shape (batch_size, beam_size),
+            Log probabilities of k top sequences.
         """
-
         if self.attention is not None:
             assert attn_value is not None
 
