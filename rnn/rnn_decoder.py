@@ -48,14 +48,16 @@ class RNNDecoder(nn.Module):
                 train=False, teaching_force_rate=0.0):
         """
         forward
+
         :param
             hidden (tensor): of shape (batch_size, num_layers, hidden_size)
-            target (tensor): target tensor of shape (batch_size, length)
+            target (tensor): target tokens tensor of shape (batch_size, length)
             attn_value (tensor): of shape (batch_size, num_rows, value_size)
             attn_mask (tensor): of shape (batch_size, num_rows)
             train (bool): train stage or not
             teaching_force_rate (float)
-        :returns
+
+        :return
             probabilities (tensor): of shape (batch_size, num_steps, num_classes)
             predictions (tensor): of shape (batch_size, num_steps)
         """

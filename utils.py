@@ -7,6 +7,7 @@ def masked_softmax(vector, mask, dim=-1,
     :param
         vector (tensor): of shape (B, *, N)
         mask (tensor): of shape (B, *, N)
+
     :return
         result (tensor): of shape (B, *, N)
     """

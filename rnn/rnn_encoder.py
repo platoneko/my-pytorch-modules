@@ -10,6 +10,7 @@ def _bridge_bidirectional_hidden(hidden):
     the bidirectional hidden is (num_layers * num_directions, batch_size, hidden_size)
     we need to convert it to (num_layers, batch_size, num_directions * hidden_size)
     """
+
     num_layers = hidden.size(0) // 2
     _, batch_size, hidden_size = hidden.size()
     return hidden.view(num_layers, 2, batch_size, hidden_size) \
@@ -20,6 +21,7 @@ class GRUEncoder(nn.Module):
     """
     A GRU recurrent neural network encoder.
     """
+
     def __init__(self,
                  input_size,
                  hidden_size,
@@ -44,10 +46,12 @@ class GRUEncoder(nn.Module):
     def forward(self, inputs, hidden=None):
         """
         forward
+
         :param
             inputs (tensor, tuple): input tensor, or tuple containing input tensor and lengths.
             hidden (tensor): of shape (num_layers * num_directions, batch, hidden_size),
                              containing the initial hidden state for each element in the batch.
+
         :returns
             outputs (tensor): of shape (batch, length, hidden_size * num_directions).
             last_hidden (tensor): of shape (num_layers, batch, num_directions * hidden_size).
@@ -101,6 +105,7 @@ class LSTMEncoder(nn.Module):
     """
     A LSTM recurrent neural network encoder.
     """
+
     def __init__(self,
                  input_size,
                  hidden_size,
@@ -125,11 +130,14 @@ class LSTMEncoder(nn.Module):
     def forward(self, inputs, hidden=None, cell_state=None):
         """
         forward
+
         :param
             inputs (tensor, tuple): input tensor, or tuple containing input tensor and lengths.
-            hidden (tensor): of shape (num_layers * num_directions, batch, hidden_size),
-                             containing the initial hidden state for each element in the batch.
-        :returns
+            hidden (tensor):
+                of shape (num_layers * num_directions, batch, hidden_size),
+                containing the initial hidden state for each element in the batch.
+
+        :return
             outputs (tensor): of shape (batch, length, hidden_size * num_directions).
             last_hidden (tensor): of shape (num_layers, batch, num_directions * hidden_size).
             last_cell_state (tensor): of shape (num_layers, batch, num_directions * hidden_size).
