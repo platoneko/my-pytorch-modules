@@ -15,7 +15,8 @@ class GRUDecoder(nn.Module):
                  start_index,
                  embedder=None,
                  attention=None,
-                 num_steps=50):
+                 num_steps=50,
+                 dropout=0.0):
         super().__init__()
 
         self.input_size = input_size
@@ -26,6 +27,7 @@ class GRUDecoder(nn.Module):
         self.attention = attention
         self.num_steps = num_steps
         self.rnn_input_size = self.input_size
+        self.dropout = dropout
 
         if self.attention is not None:
             self.rnn_input_size += self.attention.value_size
@@ -188,7 +190,8 @@ class LSTMDecoder(nn.Module):
                  start_index,
                  embedder=None,
                  attention=None,
-                 num_steps=50):
+                 num_steps=50,
+                 dropout=0.0):
         super().__init__()
 
         self.input_size = input_size
@@ -199,6 +202,7 @@ class LSTMDecoder(nn.Module):
         self.attention = attention
         self.num_steps = num_steps
         self.rnn_input_size = self.input_size
+        self.dropout = dropout
 
         if self.attention is not None:
             self.rnn_input_size += self.attention.value_size
