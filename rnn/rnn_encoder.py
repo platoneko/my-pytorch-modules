@@ -80,6 +80,8 @@ class GRUEncoder(nn.Module):
 
             if hidden is not None:
                 hidden = hidden.index_select(1, indices)[:, :num_valid]
+        else:
+            rnn_inputs = inputs
 
         outputs, last_hidden = self.rnn(rnn_inputs, hidden)
 
@@ -173,6 +175,8 @@ class LSTMEncoder(nn.Module):
                 hidden = hidden.index_select(1, indices)[:, :num_valid]
                 cell_state = cell_state.index_select(1, indices)[:, :num_valid]
                 hidden_tuple = (hidden, cell_state)
+        else:
+            rnn_inputs = inputs
 
         outputs, (last_hidden, last_cell_state) = self.rnn(rnn_inputs, hidden_tuple)
 
