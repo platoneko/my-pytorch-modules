@@ -13,7 +13,7 @@ class GRUDecoder(nn.Module):
                  hidden_size,
                  num_classes,
                  start_index,
-                 embedder=None,
+                 embedding,
                  attention=None,
                  num_steps=50,
                  dropout=0.0):
@@ -23,7 +23,7 @@ class GRUDecoder(nn.Module):
         self.hidden_size = hidden_size
         self.num_classes = num_classes
         self.start_index = start_index
-        self.embedder = embedder
+        self.embedding = embedding
         self.attention = attention
         self.num_steps = num_steps
         self.rnn_input_size = self.input_size
@@ -98,7 +98,7 @@ class GRUDecoder(nn.Module):
 
     def _take_step(self, inputs, hidden, attn_value=None, attn_mask=None):
         # shape: (batch_size, input_size)
-        embedded_inputs = self.embedder(inputs)
+        embedded_inputs = self.embedding(inputs)
         rnn_inputs = embedded_inputs
         if self.attention is not None:
             # shape: (batch_size, num_rows)
@@ -161,7 +161,7 @@ class GRUDecoder(nn.Module):
 
     def _beam_step(self, inputs, state):
         # shape: (group_size, input_size)
-        embedded_inputs = self.embedder(inputs)
+        embedded_inputs = self.embedding(inputs)
         rnn_inputs = embedded_inputs
         hidden = state['hidden']
         if self.attention is not None:
@@ -188,7 +188,7 @@ class LSTMDecoder(nn.Module):
                  hidden_size,
                  num_classes,
                  start_index,
-                 embedder=None,
+                 embedding=None,
                  attention=None,
                  num_steps=50,
                  dropout=0.0):
@@ -198,7 +198,7 @@ class LSTMDecoder(nn.Module):
         self.hidden_size = hidden_size
         self.num_classes = num_classes
         self.start_index = start_index
-        self.embedder = embedder
+        self.embedding = embedding
         self.attention = attention
         self.num_steps = num_steps
         self.rnn_input_size = self.input_size
@@ -276,7 +276,7 @@ class LSTMDecoder(nn.Module):
 
     def _take_step(self, inputs, hidden_tuple, attn_value=None, attn_mask=None):
         # shape: (batch_size, input_size)
-        embedded_inputs = self.embedder(inputs)
+        embedded_inputs = self.embedding(inputs)
         rnn_inputs = embedded_inputs
         if self.attention is not None:
             # shape: (batch_size, num_rows)
@@ -339,7 +339,7 @@ class LSTMDecoder(nn.Module):
 
     def _beam_step(self, inputs, state):
         # shape: (group_size, input_size)
-        embedded_inputs = self.embedder(inputs)
+        embedded_inputs = self.embedding(inputs)
         rnn_inputs = embedded_inputs
         hidden = state['hidden']
         cell_state = state['cell_state']
