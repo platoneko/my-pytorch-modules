@@ -13,6 +13,7 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.nn.parameter import Parameter
 from utils import masked_softmax
 
@@ -32,10 +33,13 @@ class BilinearAttention(nn.Module):
         torch.nn.init.xavier_uniform_(self._weight_matrix)
         self._bias.data.fill_(0)
 
-    def forward(self, query, value, mask):
+    def forward(self, query, value, mask=None):
         intermediate = query.mm(self._weight_matrix).unsqueeze(1)
         intermediate = torch.tanh(intermediate.bmm(value.transpose(1, 2)).squeeze(1) + self._bias)
-        score = masked_softmax(intermediate, mask)
+        if mask is not None:
+            score = masked_softmax(intermediate, mask)
+        else:
+            score = F.softmax(intermediate, dim=-1)
         return score
 
 
@@ -43,11 +47,14 @@ class CosineAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, query, value, mask):
+    def forward(self, query, value, mask=None):
         q_norm = query / (query.norm(p=2, dim=-1, keepdim=True) + 1e-13)
         v_norm = value / (value.norm(p=2, dim=-1, keepdim=True) + 1e-13)
         intermediate = torch.bmm(q_norm.unsqueeze(1), v_norm.transpose(1, 2)).squeeze(1)
-        score = masked_softmax(intermediate, mask)
+        if mask is not None:
+            score = masked_softmax(intermediate, mask)
+        else:
+            score = F.softmax(intermediate, dim=-1)
         return score
 
 
@@ -55,9 +62,12 @@ class DotProductAttention(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(self, query, value, mask):
+    def forward(self, query, value, mask=None):
         intermediate = value.bmm(query.unsqueeze(-1)).squeeze(-1)
-        score = masked_softmax(intermediate, mask)
+        if mask is not None:
+            score = masked_softmax(intermediate, mask)
+        else:
+            score = F.softmax(intermediate, dim=-1)
         return score
 
 
@@ -73,10 +83,13 @@ class MLPAttention(nn.Module):
         self.tanh = nn.Tanh()
         self.linear_hidden = nn.Linear(self.hidden_size, 1, bias=False)
         
-    def forward(self, query, value, mask):
+    def forward(self, query, value, mask=None):
         hidden = self.linear_query(query).unsqueeze(1) \
                  + self.linear_memory(value)
         intermediate = self.tanh(hidden)
         intermediate = self.linear_hidden(intermediate).squeeze(-1)
-        score = masked_softmax(intermediate, mask)
+        if mask is not None:
+            score = masked_softmax(intermediate, mask)
+        else:
+            score = F.softmax(intermediate, dim=-1)
         return score
