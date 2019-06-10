@@ -4,7 +4,7 @@ import torch.nn.functional as F
 
 class TransformerFFN(nn.Module):
     def __init__(self, model_dim, hidden_size, dropout=0.0):
-        super(TransformerFFN, self).__init__()
+        super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.lin1 = nn.Linear(model_dim, hidden_size)
         self.lin2 = nn.Linear(hidden_size, model_dim)
