@@ -18,8 +18,9 @@ def _normalize(tensor, norm_layer):
 
 class TransformerDecoder(nn.Module):
     """
-    Transformer Decoder layer.
-     :param int n_heads: the number of multihead attention heads.
+    Transformer decoder module.
+
+    :param int n_heads: the number of multihead attention heads.
     :param int n_layers: number of transformer layers.
     :param int embedding_size: the embedding sizes. Must be a multiple of n_heads.
     :param int ffn_size: the size of the hidden layer in the FFN
@@ -54,6 +55,35 @@ class TransformerDecoder(nn.Module):
         learn_positional_embeddings=False,
         num_positions=1024,
     ):
+        """
+        :param
+        num_heads : ``int``, required.
+            Number of multihead attention heads.
+        num_layers : ``int``, required.
+            Number of transformer layers.
+        embedding_size : ``int``, required.
+            Must be a multiple of n_heads.
+        embedding : ``torch.nn.Embedding``, required.
+            An embedding matrix for the bottom layer of the transformer.
+        ffn_size : ``int``,  required.
+            The size of the hidden layer in the FFN.
+        dropout : ``float``, optional (default = 0.0)
+            Dropout used around embeddings and before layer normalizations.
+            This is used in Vaswani 2017 and works well on large datasets.
+        attention_dropout : ``float``, optional (default = `dropout`)
+            Dropout performed after the multi-head attention softmax.
+        relu_dropout : ``float``, optional (default = `dropout`)
+            Dropout used after the ReLU in the FFN.
+            Not usedin Vaswani 2017, but used in Tensor2Tensor.
+        learn_positional_embeddings : ``bool``, optional (default = False)
+            If off, sinusoidal embeddings are used.
+            If on, position embeddings are learned from scratch.
+        embeddings_scale : ``bool``, optional (default = False)
+            Scale embeddings relative to their dimensionality. Found useful in fairseq.
+        num_positions : ``int``, optional (default = 1024)
+            Max position of the position embeddings matrix.
+        """
+
         super().__init__()
         self.embedding_size = embedding_size
         self.ffn_size = ffn_size
