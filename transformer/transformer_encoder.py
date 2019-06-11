@@ -8,6 +8,14 @@ from transformer import TransformerFFN
 from utils import create_positional_features, get_device_of
 
 
+def _normalize(tensor, norm_layer):
+    """
+    Broadcast layer norm
+    """
+    size = tensor.size()
+    return norm_layer(tensor.view(-1, size[-1])).view(size)
+
+
 class TransformerEncoder(nn.Module):
     """
     Transformer encoder module.
@@ -165,8 +173,9 @@ class TransformerEncoderLayer(nn.Module):
 
     def forward(self, tensor, mask):
         tensor = tensor + self.dropout(self.attention(tensor, tensor, tensor, mask=mask))
-        tensor = self.norm1(tensor)
+        tensor = _normalize(tensor, self.norm1)
         tensor = tensor + self.dropout(self.ffn(tensor))
-        tensor = self.norm2(tensor)
+        tensor = _normalize(tensor, self.norm2)
+        # processing padding
         tensor *= mask.unsqueeze(-1).float()
         return tensor
