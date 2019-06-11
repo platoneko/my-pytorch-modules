@@ -45,7 +45,6 @@ class GRUDecoder(nn.Module):
                 target=None,
                 attn_value=None,
                 attn_mask=None,
-                train=False,
                 teaching_force_rate=0.0):
         """
         forward
@@ -59,8 +58,6 @@ class GRUDecoder(nn.Module):
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
         attn_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
-        train : ``bool``, optional (default = False)
-            Train stage or not.
         teaching_force_rate : ``float``, optional (default = 0.0)
 
         :return
@@ -72,7 +69,7 @@ class GRUDecoder(nn.Module):
         if self.attention is not None:
             assert attn_value is not None
 
-        if train and target is not None:
+        if self.training and target is not None:
             num_steps = target.size(1)
         else:
             num_steps = self.num_steps
@@ -81,7 +78,7 @@ class GRUDecoder(nn.Module):
         step_logits = []
         step_predictions = []
         for timestep in range(num_steps):
-            if train and target and torch.rand(1).item() < teaching_force_rate:
+            if self.training and target and torch.rand(1).item() < teaching_force_rate:
                 inputs = target[:, timestep]
             else:
                 inputs = last_predictions
@@ -220,7 +217,6 @@ class LSTMDecoder(nn.Module):
                 target=None,
                 attn_value=None,
                 attn_mask=None,
-                train=False,
                 teaching_force_rate=0.0):
         """
         forward
@@ -234,8 +230,6 @@ class LSTMDecoder(nn.Module):
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
         attn_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
-        train : ``bool``, optional (default = False)
-            Train stage or not.
         teaching_force_rate : ``float``, optional (default = 0.0)
 
         :return
@@ -247,7 +241,7 @@ class LSTMDecoder(nn.Module):
         if self.attention is not None:
             assert attn_value is not None
 
-        if train and target is not None:
+        if self.training and target is not None:
             num_steps = target.size(1)
         else:
             num_steps = self.num_steps
@@ -259,7 +253,7 @@ class LSTMDecoder(nn.Module):
         step_logits = []
         step_predictions = []
         for timestep in range(num_steps):
-            if train and target and torch.rand(1).item() < teaching_force_rate:
+            if self.training and target and torch.rand(1).item() < teaching_force_rate:
                 inputs = target[:, timestep]
             else:
                 inputs = last_predictions
