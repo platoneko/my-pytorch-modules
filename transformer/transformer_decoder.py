@@ -19,26 +19,6 @@ def _normalize(tensor, norm_layer):
 class TransformerDecoder(nn.Module):
     """
     Transformer decoder module.
-
-    :param int n_heads: the number of multihead attention heads.
-    :param int n_layers: number of transformer layers.
-    :param int embedding_size: the embedding sizes. Must be a multiple of n_heads.
-    :param int ffn_size: the size of the hidden layer in the FFN
-    :param embedding: an embedding matrix for the bottom layer of the transformer.
-        If none, one is created for this encoder.
-    :param float dropout: Dropout used around embeddings and before layer
-        layer normalizations. This is used in Vaswani 2017 and works well on
-        large datasets.
-    :param float attention_dropout: Dropout performed after the multhead attention
-        softmax. This is not used in Vaswani 2017.
-    :param float relu_attention: Dropout used after the ReLU in the FFN. Not used
-        in Vaswani 2017, but used in Tensor2Tensor.
-    :param int padding_idx: Reserved padding index in the embeddings matrix.
-    :param bool learn_positional_embeddings: If off, sinusoidal embeddings are
-        used. If on, position embeddings are learned from scratch.
-    :param bool embeddings_scale: Scale embeddings relative to their dimensionality.
-        Found useful in fairseq.
-    :param int n_positions: Size of the position embeddings matrix.
     """
 
     def __init__(
