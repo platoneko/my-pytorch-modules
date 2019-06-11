@@ -98,6 +98,7 @@ class TransformerEncoder(nn.Module):
                 num_positions,
                 embedding_size,
                 get_device_of(self.position_embeddings.weight))
+            self.position_embeddings.weight.requires_grad = False
         else:
             nn.init.normal_(self.position_embeddings.weight, 0, math.sqrt(embedding_size))
 
@@ -172,6 +173,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, tensor, mask):
+        # shape (batch_size, seq_len, embedding_size)
         tensor = tensor + self.dropout(self.attention(tensor, tensor, tensor, mask=mask))
         tensor = _normalize(tensor, self.norm1)
         tensor = tensor + self.dropout(self.ffn(tensor))
