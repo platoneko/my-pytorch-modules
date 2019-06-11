@@ -40,7 +40,7 @@ class MultiHeadAttention(nn.Module):
             (batch_size, query_len, key_len) (enc-attention)
         :return
         outputs : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (batch_size, query_len, dim)
+            A ``torch.FloatTensor`` of shape (batch_size, query_len, dim), (not padding)
         """
 
         batch_size, query_len, dim = query.size()
@@ -71,13 +71,15 @@ class MultiHeadAttention(nn.Module):
 
         # shape: (batch_size * num_heads, query_length, key_length)
         dot_prod = q.bmm(k.transpose(1, 2))
-        attn_mask = (mask == 0).\
-            view(batch_size, 1, -1, key_len).\
-            repeat(1, num_heads, 1, 1).\
-            expand(batch_size, num_heads, query_len, key_len).\
-            view(batch_size * num_heads, query_len, key_len)
-        assert attn_mask.shape == dot_prod.shape
-        dot_prod.masked_fill_(attn_mask, -float(1e20))
+
+        if mask is not None:
+            attn_mask = (mask == 0).\
+                view(batch_size, 1, -1, key_len).\
+                repeat(1, num_heads, 1, 1).\
+                expand(batch_size, num_heads, query_len, key_len).\
+                view(batch_size * num_heads, query_len, key_len)
+            assert attn_mask.shape == dot_prod.shape
+            dot_prod.masked_fill_(attn_mask, -float(1e20))
 
         attn_score = F.softmax(dot_prod / scale, dim=-1)
         attn_score = self.attn_dropout(attn_score)  # --attention-dropout
