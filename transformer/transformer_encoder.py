@@ -22,20 +22,20 @@ class TransformerEncoder(nn.Module):
     """
 
     def __init__(
-        self,
-        num_heads,
-        num_layers,
-        embedding_size,
-        embedding,
-        ffn_size,
-        pad_index,
-        dropout=0.0,
-        attention_dropout=None,
-        relu_dropout=None,
-        learn_positional_embeddings=False,
-        embeddings_scale=False,
-        reduction=True,
-        num_positions=1024
+            self,
+            num_heads,
+            num_layers,
+            embedding_size,
+            embedding,
+            ffn_size,
+            pad_index,
+            dropout=0.0,
+            attention_dropout=None,
+            relu_dropout=None,
+            learn_positional_embeddings=False,
+            embeddings_scale=False,
+            reduction=False,
+            num_positions=1024
     ):
         """
         :param
@@ -151,13 +151,13 @@ class TransformerEncoder(nn.Module):
 
 class TransformerEncoderLayer(nn.Module):
     def __init__(
-        self,
-        num_heads,
-        embedding_size,
-        ffn_size,
-        attention_dropout=0.0,
-        relu_dropout=0.0,
-        dropout=0.0,
+            self,
+            num_heads,
+            embedding_size,
+            ffn_size,
+            attention_dropout=0.0,
+            relu_dropout=0.0,
+            dropout=0.0,
     ):
         super().__init__()
 

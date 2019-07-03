@@ -2,6 +2,27 @@ import torch
 import math
 
 
+def sequence_mask(lengths, max_len=None):
+    """
+    Creates a boolean mask from sequence lengths.
+    :param
+    lengths : ``torch.LongTensor``, required.
+        A ``torch.LongTensor`` of shape (B,) which contains a batch of sequence lengths.
+    :return
+    mask : ``torch.ByteTensor``
+        A ``torch.ByteTensor`` of shape (B, len)
+    """
+    if max_len is None:
+        max_len = lengths.max().item()
+    mask = torch.arange(0, max_len, dtype=torch.long).type_as(lengths)
+    mask = mask.unsqueeze(0)
+    mask = mask.repeat(1, *lengths.size(), 1)
+    mask = mask.squeeze(0)
+    mask = mask.lt(lengths.unsqueeze(-1))
+    #mask = mask.repeat(*lengths.size(), 1).lt(lengths.unsqueeze(-1))
+    return mask
+
+
 def masked_softmax(vector, mask, dim=-1,
                    mask_fill_value=-1e32):
     """

@@ -22,18 +22,18 @@ class TransformerDecoder(nn.Module):
     """
 
     def __init__(
-        self,
-        num_heads,
-        num_layers,
-        embedding_size,
-        ffn_size,
-        embedding,
-        dropout=0.0,
-        attention_dropout=None,
-        relu_dropout=None,
-        embeddings_scale=True,
-        learn_positional_embeddings=False,
-        num_positions=1024,
+            self,
+            num_heads,
+            num_layers,
+            embedding_size,
+            ffn_size,
+            embedding,
+            dropout=0.0,
+            attention_dropout=None,
+            relu_dropout=None,
+            embeddings_scale=True,
+            learn_positional_embeddings=False,
+            num_positions=1024,
     ):
         """
         :param
