@@ -2,7 +2,7 @@ import torch
 import math
 
 
-def sequence_mask(lengths, max_len=None):
+def get_sequence_mask(lengths, max_len=None):
     """
     Creates a boolean mask from sequence lengths.
     :param
