@@ -32,7 +32,7 @@ class BeamSearch:
         self.beam_size = beam_size
         self.per_node_beam_size = per_node_beam_size or beam_size
 
-    def search(self, start_predictions, start_state, step):
+    def search(self, start_predictions, start_state, step, early_stop=False):
         """
         Given a starting state and a step function, apply beam search to find the
         most likely target sequences.
@@ -59,6 +59,8 @@ class BeamSearch:
             the log probabilities of the tokens for the next step, and the second
             element is the updated state. The tensor in the state should have shape
             ``(group_size, *)``, where ``*`` means any other number of dimensions.
+        early_stop : ``bool``, optional (default = False).
+            If every predicted token from the last step is `self.end_index`, then we can stop early.
 
         :return
         all_predictions : ``torch.LongTensor``
@@ -130,7 +132,7 @@ class BeamSearch:
 
             # If every predicted token from the last step is `self.end_index`,
             # then we can stop early.
-            if (last_predictions == self.end_index).all():
+            if early_stop and (last_predictions == self.end_index).all():
                 break
 
             # Take a step. This get the predicted log probs of the next classes
@@ -225,7 +227,6 @@ class BeamSearch:
         for timestep in range(len(predictions) - 2, 0, -1):
             # shape: (batch_size, beam_size, 1)
             cur_preds = predictions[timestep].gather(1, cur_backpointers).unsqueeze(2)
-
             reconstructed_predictions.append(cur_preds)
 
             # shape: (batch_size, beam_size)

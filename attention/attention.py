@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn.parameter import Parameter
-from utils import masked_softmax
+from modules.utils import masked_softmax
 
 
 class BilinearAttention(nn.Module):
@@ -25,6 +25,8 @@ class BilinearAttention(nn.Module):
 
     def __init__(self, query_size, value_size):
         super().__init__()
+        self.query_size = query_size
+        self.value_size = value_size
         self._weight_matrix = Parameter(torch.Tensor(query_size, value_size))
         self._bias = Parameter(torch.Tensor(1))
         self.reset_parameters()
@@ -78,14 +80,17 @@ class MLPAttention(nn.Module):
 
     def __init__(self, query_size, value_size, hidden_size):
         super().__init__()
+        self.query_size = query_size
+        self.value_size = value_size
+        self.hidden_size = hidden_size
         self.linear_query = nn.Linear(query_size, hidden_size, bias=True)
         self.linear_value = nn.Linear(value_size, hidden_size, bias=False)
         self.tanh = nn.Tanh()
-        self.linear_hidden = nn.Linear(self.hidden_size, 1, bias=False)
-        
+        self.linear_hidden = nn.Linear(hidden_size, 1, bias=False)
+
     def forward(self, query, value, mask=None):
         hidden = self.linear_query(query).unsqueeze(1) \
-                 + self.linear_memory(value)
+                 + self.linear_value(value)
         intermediate = self.tanh(hidden)
         intermediate = self.linear_hidden(intermediate).squeeze(-1)
         if mask is not None:
