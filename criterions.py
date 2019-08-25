@@ -1,3 +1,4 @@
+import torch
 import torch.nn.functional as F
 from torch.nn.modules.loss import _Loss
 
@@ -73,3 +74,19 @@ class SequenceCrossEntropy(_Loss):
                 cross_entropy = cross_entropy.sum()
 
         return cross_entropy
+
+
+class FocalLoss(_Loss):
+    def __init__(self, gamma=2, reduce=True):
+        super(FocalLoss, self).__init__()
+        self.gamma = gamma
+        self.reduce = reduce
+
+    def forward(self, inputs, targets):
+        nll_loss = F.nll_loss(inputs, targets, reduction='none')
+        pt = torch.exp(-nll_loss)
+        F_loss = (1 - pt)**self.gamma * nll_loss
+        if self.reduce:
+            return torch.mean(F_loss)
+        else:
+            return F_loss
