@@ -77,16 +77,13 @@ class SequenceCrossEntropy(_Loss):
 
 
 class FocalLoss(_Loss):
-    def __init__(self, gamma=2, reduce=True):
+    def __init__(self, gamma=2, reduction='mean'):
         super(FocalLoss, self).__init__()
         self.gamma = gamma
-        self.reduce = reduce
+        self.reduction = reduction
 
-    def forward(self, inputs, targets):
-        nll_loss = F.nll_loss(inputs, targets, reduction='none')
+    def forward(self, input, target):
+        nll_loss = F.nll_loss(input, target, reduction=self.reduction)
         pt = torch.exp(-nll_loss)
-        F_loss = (1 - pt)**self.gamma * nll_loss
-        if self.reduce:
-            return torch.mean(F_loss)
-        else:
-            return F_loss
+        f_loss = (1 - pt)**self.gamma * nll_loss
+        return f_loss
