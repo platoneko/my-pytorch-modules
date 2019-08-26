@@ -19,7 +19,7 @@ def get_sequence_mask(lengths, max_len=None):
     mask = mask.repeat(1, *lengths.size(), 1)
     mask = mask.squeeze(0)
     mask = mask.lt(lengths.unsqueeze(-1))
-    #mask = mask.repeat(*lengths.size(), 1).lt(lengths.unsqueeze(-1))
+    # mask = mask.repeat(*lengths.size(), 1).lt(lengths.unsqueeze(-1))
     return mask
 
 
@@ -121,111 +121,7 @@ def sequence_cross_entropy_with_logits(logits,
         return per_batch_loss
 
 
-def add_positional_features(tensor,
-                            min_timescale=1.0,
-                            max_timescale=1.0e4):
-    """
-    Implements the frequency-based positional encoding described
-    in `Attention is all you Need
-    <https://www.semanticscholar.org/paper/Attention-Is-All-You-Need-Vaswani-Shazeer/0737da0767d77606169cbf4187b83e1ab62f6077>`_ .
-
-    Adds sinusoids of different frequencies to a ``Tensor``. A sinusoid of a
-    different frequency and phase is added to each dimension of the input ``Tensor``.
-    This allows the attention heads to use absolute and relative positions.
-
-    The number of timescales is equal to hidden_dim / 2 within the range
-    (min_timescale, max_timescale). For each timescale, the two sinusoidal
-    signals sin(timestep / timescale) and cos(timestep / timescale) are
-    generated and concatenated along the hidden_dim dimension.
-
-    :param
-    tensor : ``torch.Tensor``, required.
-        a Tensor with shape (batch_size, timesteps, hidden_size).
-    min_timescale : ``float``, optional (default = 1.0)
-        The smallest timescale to use.
-    max_timescale : ``float``, optional (default = 1.0e4)
-        The largest timescale to use.
-
-    :return
-    The input tensor augmented with the sinusoidal frequencies.
-    """
-    _, timesteps, hidden_size = tensor.size()
-
-    timestep_range = get_range_vector(timesteps, get_device_of(tensor)).data.float()
-    # We're generating both cos and sin frequencies,
-    # so half for each.
-    num_timescales = hidden_size // 2
-    timescale_range = get_range_vector(num_timescales, get_device_of(tensor)).data.float()
-
-    log_timescale_increments = math.log(float(max_timescale) / float(min_timescale)) / float(num_timescales - 1)
-    inverse_timescales = min_timescale * torch.exp(timescale_range * -log_timescale_increments)
-
-    # Broadcasted multiplication - shape (timesteps, num_timescales)
-    scaled_time = timestep_range.unsqueeze(1) * inverse_timescales.unsqueeze(0)
-    # shape (timesteps, 2 * num_timescales)
-    sinusoids = torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], 1)
-    if hidden_size % 2 != 0:
-        # if the number of dimensions is odd, the cos and sin
-        # timescales had size (hidden_dim - 1) / 2, so we need
-        # to add a row of zeros to make up the difference.
-        sinusoids = torch.cat([sinusoids, sinusoids.new_zeros(timesteps, 1)], 1)
-    return tensor + sinusoids.unsqueeze(0)
-
-
-def create_positional_features(timesteps,
-                               hidden_size,
-                               min_timescale=1.0,
-                               max_timescale=1.0e4,
-                               device=-1):
-    """
-    Implements the frequency-based positional encoding described
-    in `Attention is all you Need
-    <https://www.semanticscholar.org/paper/Attention-Is-All-You-Need-Vaswani-Shazeer/0737da0767d77606169cbf4187b83e1ab62f6077>`_ .
-
-    Adds sinusoids of different frequencies to a ``Tensor``. A sinusoid of a
-    different frequency and phase is added to each dimension of the input ``Tensor``.
-    This allows the attention heads to use absolute and relative positions.
-
-    The number of timescales is equal to hidden_dim / 2 within the range
-    (min_timescale, max_timescale). For each timescale, the two sinusoidal
-    signals sin(timestep / timescale) and cos(timestep / timescale) are
-    generated and concatenated along the hidden_dim dimension.
-
-    :param
-    timesteps : ``int``, required.
-    hidden_size : ``hidden_size``, required.
-    min_timescale : ``float``, optional (default = 1.0)
-        The smallest timescale to use.
-    max_timescale : ``float``, optional (default = 1.0e4)
-        The largest timescale to use.
-    device : ``int``, optional (default = -1)
-        -1 for cpu, while any integer > -1 for gpu.
-
-    :return
-    The sinusoidal frequencies of shape (timesteps, hidden_size).
-    """
-    timestep_range = get_range_vector(timesteps, device).data.float()
-    # We're generating both cos and sin frequencies,
-    # so half for each.
-    num_timescales = hidden_size // 2
-    timescale_range = get_range_vector(num_timescales, device).data.float()
-
-    log_timescale_increments = math.log(float(max_timescale) / float(min_timescale)) / float(num_timescales - 1)
-    inverse_timescales = min_timescale * torch.exp(timescale_range * -log_timescale_increments)
-
-    # Broadcasted multiplication - shape (timesteps, num_timescales)
-    scaled_time = timestep_range.unsqueeze(1) * inverse_timescales.unsqueeze(0)
-    # shape (timesteps, 2 * num_timescales)
-    sinusoids = torch.cat([torch.sin(scaled_time), torch.cos(scaled_time)], 1)
-    if hidden_size % 2 != 0:
-        # if the number of dimensions is odd, the cos and sin
-        # timescales had size (hidden_dim - 1) / 2, so we need
-        # to add a row of zeros to make up the difference.
-        sinusoids = torch.cat([sinusoids, sinusoids.new_zeros(timesteps, 1)], 1)
-    return sinusoids.unsqueeze(0)
-
-
-def get_range_vector(size, device) -> torch.Tensor:
+def get_range_vector(size, device):
     """
     Returns a range vector with the desired size, starting at 0. The CUDA implementation
     is meant to avoid copy data from CPU to GPU.

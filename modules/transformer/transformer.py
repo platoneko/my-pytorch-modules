@@ -1,9 +1,7 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
-from transformer import TransformerEncoder
-from transformer import TransformerDecoder
+from modules.transformer import TransformerEncoder
+from modules.transformer import TransformerDecoder
 
 
 class Transformer(nn.Module):

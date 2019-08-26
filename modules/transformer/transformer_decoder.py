@@ -3,9 +3,9 @@ import torch.nn as nn
 import math
 import numpy as np
 
-from utils import create_positional_features, get_device_of
-from transformer import MultiHeadAttention
-from transformer import TransformerFFN
+from modules.utils import create_positional_features, get_device_of
+from modules.transformer import MultiHeadAttention
+from modules.transformer import TransformerFFN
 
 
 def _normalize(tensor, norm_layer):

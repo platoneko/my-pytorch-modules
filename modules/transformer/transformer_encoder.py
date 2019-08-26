@@ -3,17 +3,8 @@ import torch.nn as nn
 import math
 import numpy as np
 
-from transformer import MultiHeadAttention
-from transformer import TransformerFFN
-from utils import create_positional_features, get_device_of
-
-
-def _normalize(tensor, norm_layer):
-    """
-    Broadcast layer norm
-    """
-    size = tensor.size()
-    return norm_layer(tensor.view(-1, size[-1])).view(size)
+from modules.transformer import MultiHeadAttention
+from modules.transformer import TransformerFFN
 
 
 class TransformerEncoder(nn.Module):
