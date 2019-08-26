@@ -39,7 +39,7 @@ class MultiHeadAttention(nn.Module):
             A ``torch.LongTensor`` of shape (batch_size, key_len) (self-attention) or
             (batch_size, query_len, key_len) (enc-attention)
         :return
-        outputs : ``torch.FloatTensor``
+        output : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (batch_size, query_len, dim), (not padding)
         """
 
@@ -84,13 +84,12 @@ class MultiHeadAttention(nn.Module):
         attn_score = F.softmax(dot_prod / scale, dim=-1)
         attn_score = self.attn_dropout(attn_score)  # --attention-dropout
 
-        outputs = attn_score.bmm(v)
-        outputs = outputs.\
+        output = attn_score.bmm(v)
+        output = output.\
             view(batch_size, num_heads, query_len, dim_per_head).\
             transpose(1, 2).\
             contiguous().\
             view(batch_size, query_len, dim)
+        output = self.out_lin(output)
 
-        outputs = self.out_lin(outputs)
-
-        return outputs
+        return output

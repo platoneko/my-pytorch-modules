@@ -25,6 +25,7 @@ class GRUEncoder(nn.Module):
     def __init__(self,
                  input_size,
                  hidden_size,
+                 embedding,
                  num_layers=1,
                  bidirectional=True,
                  dropout=0.0):
@@ -32,79 +33,81 @@ class GRUEncoder(nn.Module):
 
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.embedding = embedding
         self.num_layers = num_layers
         self.bidirectional = bidirectional
         self.dropout = dropout
 
-        self.rnn = nn.GRU(input_size=self.input_size,
-                          hidden_size=self.hidden_size,
-                          num_layers=self.num_layers,
-                          batch_first=True,
-                          dropout=self.dropout if self.num_layers > 1 else 0,
-                          bidirectional=self.bidirectional)
+        self.rnn = nn.GRU(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            batch_first=True,
+            dropout=self.dropout if self.num_layers > 1 else 0,
+            bidirectional=self.bidirectional
+        )
 
-    def forward(self, inputs, hidden=None):
+    def forward(self, input, hidden=None):
         """
         forward
 
         :param
-        inputs : ``torch.FloatTensor`` or ``Tuple(torch.FloatTensor, torch.LongTensor)``, required.
-            Input tensor, or tuple containing input tensor and lengths.
+        input : ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
+            Input tensor of shape (batch_size, length), or tuple containing input tensor and length.
         hidden : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (num_layers * num_directions, batch, hidden_size),
             containing the initial hidden state for each element in the batch.
 
         :return
-        outputs : ``torch.FloatTensor``
+        output : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (batch, length, hidden_size * num_directions).
         last_hidden : : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
         """
-        if isinstance(inputs, tuple):
-            inputs, lengths = inputs
+        if isinstance(input, tuple):
+            input, length = input
         else:
-            inputs, lengths = inputs, None
+            input, length = input, None
 
-        batch_size = inputs.size(0)
+        batch_size = input.size(0)
 
-        if lengths is not None:
+        if length is not None:
             #  length may be 0, however pytorch `pack_padded_sequence` can't haddle this case.
-            num_valid = lengths.gt(0).int().sum().item()
-            sorted_lengths, indices = lengths.sort(descending=True)
-            rnn_inputs = inputs.index_select(0, indices)
+            num_valid = length.gt(0).int().sum().item()
+            sorted_length, indices = length.sort(descending=True)
+            rnn_input = self.embedding(input.index_select(0, indices))
 
-            rnn_inputs = pack_padded_sequence(
-                rnn_inputs[:num_valid],
-                sorted_lengths[:num_valid].tolist(),
-                batch_first=True)
+            rnn_input = pack_padded_sequence(
+                rnn_input[:num_valid],
+                sorted_length[:num_valid].tolist(),
+                batch_first=True
+            )
 
             if hidden is not None:
                 hidden = hidden.index_select(1, indices)[:, :num_valid]
         else:
-            rnn_inputs = inputs
+            rnn_input = self.embedding(input)
 
-        outputs, last_hidden = self.rnn(rnn_inputs, hidden)
+        output, last_hidden = self.rnn(rnn_input, hidden)
 
         if self.bidirectional:
             last_hidden = _bridge_bidirectional_hidden(last_hidden)
 
-        if lengths is not None:
-            outputs, _ = pad_packed_sequence(outputs, batch_first=True)
-
+        if length is not None:
+            output, _ = pad_packed_sequence(output, batch_first=True)
             if num_valid < batch_size:
-                zeros = outputs.new_zeros(
-                    batch_size - num_valid, outputs.size(1), outputs.size(2))
-                outputs = torch.cat([outputs, zeros], dim=0)
+                zeros = output.new_zeros(
+                    batch_size - num_valid, output.size(1), output.size(2))
+                output = torch.cat([output, zeros], dim=0)
 
                 zeros = last_hidden.new_zeros(
-                    self.num_layers, batch_size - num_valid, outputs.size(2))
+                    self.num_layers, batch_size - num_valid, output.size(2))
                 last_hidden = torch.cat([last_hidden, zeros], dim=1)
-
             _, inv_indices = indices.sort()
-            outputs = outputs.index_select(0, inv_indices)
+            output = output.index_select(0, inv_indices)
             last_hidden = last_hidden.index_select(1, inv_indices)
 
-        return outputs, last_hidden
+        return output, last_hidden
 
 
 class LSTMEncoder(nn.Module):
@@ -112,63 +115,70 @@ class LSTMEncoder(nn.Module):
     A LSTM recurrent neural network encoder.
     """
 
-    def __init__(self,
-                 input_size,
-                 hidden_size,
-                 num_layers=1,
-                 bidirectional=True,
-                 dropout=0.0):
+    def __init__(
+            self,
+            input_size,
+            hidden_size,
+            embedding,
+            num_layers=1,
+            bidirectional=True,
+            dropout=0.0
+    ):
         super(LSTMEncoder, self).__init__()
 
         self.input_size = input_size
         self.hidden_size = hidden_size
+        self.embedding = embedding
         self.num_layers = num_layers
         self.bidirectional = bidirectional
         self.dropout = dropout
 
-        self.rnn = nn.LSTM(input_size=self.input_size,
-                           hidden_size=self.hidden_size,
-                           num_layers=self.num_layers,
-                           batch_first=True,
-                           dropout=self.dropout if self.num_layers > 1 else 0,
-                           bidirectional=self.bidirectional)
+        self.rnn = nn.LSTM(
+            input_size=self.input_size,
+            hidden_size=self.hidden_size,
+            num_layers=self.num_layers,
+            batch_first=True,
+            dropout=self.dropout if self.num_layers > 1 else 0,
+            bidirectional=self.bidirectional
+        )
 
-    def forward(self, inputs, hidden_tuple=None):
+    def forward(self, input, hidden_tuple=None):
         """
         forward
 
         :param
-        inputs : ``torch.FloatTensor`` or ``Tuple(torch.FloatTensor, torch.LongTensor)``, required.
-            Input tensor, or tuple containing input tensor and lengths.
+        input : ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
+            Input tensor of shape (batch_size, length), or tuple containing input tensor and length.
         hidden_tuple : ``Tuple(torch.FloatTensor, torch.FloatTensor)``, optional (default = None)
             tuple of 2 tensor of shape (num_layers * num_directions, batch, hidden_size),
             containing the initial hidden state and initial cell state for each element in the batch.
 
         :returns
-        outputs : ``torch.FloatTensor``
+        output : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (batch, length, hidden_size * num_directions).
         last_hidden : : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
         last_cell_state : ``torch.FloatTensor``
             A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
         """
-        if isinstance(inputs, tuple):
-            inputs, lengths = inputs
+        if isinstance(input, tuple):
+            input, length = input
         else:
-            inputs, lengths = inputs, None
+            input, length = input, None
 
-        batch_size = inputs.size(0)
+        batch_size = input.size(0)
 
-        if lengths is not None:
+        if length is not None:
             #  length may be 0, however pytorch `pack_padded_sequence` can't haddle this case
-            num_valid = lengths.gt(0).int().sum().item()
-            sorted_lengths, indices = lengths.sort(descending=True)
-            rnn_inputs = inputs.index_select(0, indices)
+            num_valid = length.gt(0).int().sum().item()
+            sorted_length, indices = length.sort(descending=True)
+            rnn_input = self.embedding(input.index_select(0, indices))
 
-            rnn_inputs = pack_padded_sequence(
-                rnn_inputs[:num_valid],
-                sorted_lengths[:num_valid].tolist(),
-                batch_first=True)
+            rnn_input = pack_padded_sequence(
+                rnn_input[:num_valid],
+                sorted_length[:num_valid].tolist(),
+                batch_first=True
+            )
 
             if hidden_tuple is not None:
                 hidden, cell_state = hidden_tuple
@@ -176,33 +186,33 @@ class LSTMEncoder(nn.Module):
                 cell_state = cell_state.index_select(1, indices)[:, :num_valid]
                 hidden_tuple = (hidden, cell_state)
         else:
-            rnn_inputs = inputs
+            rnn_input = input
 
-        outputs, (last_hidden, last_cell_state) = self.rnn(rnn_inputs, hidden_tuple)
+        output, (last_hidden, last_cell_state) = self.rnn(rnn_input, hidden_tuple)
 
         if self.bidirectional:
             last_hidden = _bridge_bidirectional_hidden(last_hidden)
             last_cell_state = _bridge_bidirectional_hidden(last_cell_state)
 
-        if lengths is not None:
-            outputs, _ = pad_packed_sequence(outputs, batch_first=True)
+        if length is not None:
+            output, _ = pad_packed_sequence(output, batch_first=True)
 
             if num_valid < batch_size:
-                zeros = outputs.new_zeros(
-                    batch_size - num_valid, outputs.size(1), outputs.size(2))
-                outputs = torch.cat([outputs, zeros], dim=0)
+                zeros = output.new_zeros(
+                    batch_size - num_valid, output.size(1), output.size(2))
+                output = torch.cat([output, zeros], dim=0)
 
                 zeros = last_hidden.new_zeros(
-                    self.num_layers, batch_size - num_valid, outputs.size(2))
+                    self.num_layers, batch_size - num_valid, output.size(2))
                 last_hidden = torch.cat([last_hidden, zeros], dim=1)
 
                 zeros = last_cell_state.new_zeros(
-                    self.num_layers, batch_size - num_valid, outputs.size(2))
+                    self.num_layers, batch_size - num_valid, output.size(2))
                 last_cell_state = torch.cat([last_cell_state, zeros], dim=1)
 
             _, inv_indices = indices.sort()
-            outputs = outputs.index_select(0, inv_indices)
+            output = output.index_select(0, inv_indices)
             last_hidden = last_hidden.index_select(1, inv_indices)
             last_cell_state = last_cell_state.index_select(1, inv_indices)
 
-        return outputs, (last_hidden, last_cell_state)
+        return output, (last_hidden, last_cell_state)

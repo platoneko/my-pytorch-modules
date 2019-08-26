@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import math
 
 
@@ -140,3 +141,23 @@ def get_device_of(tensor):
         return -1
     else:
         return tensor.get_device()
+
+
+def create_position_embedding(n_pos, dim, out):
+    position_enc = np.array([
+        [pos / np.power(10000, 2 * j / dim) for j in range(dim // 2)]
+        for pos in range(n_pos)
+    ])
+
+    out[:, 0::2] = torch.FloatTensor(np.sin(position_enc))
+    out[:, 1::2] = torch.FloatTensor(np.cos(position_enc))
+    out.detach_()
+    out.requires_grad = False
+
+
+def sequence_norm(tensor, norm_layer):
+    """
+    Broadcast norm for sequence tensor
+    """
+    size = tensor.size()
+    return norm_layer(tensor.view(-1, size[-1])).view(size)

@@ -1,1 +1,3 @@
 from modules.transformer.transformer_encoder import TransformerEncoder
+from modules.transformer.transformer_decoder import TransformerDecoder
+from modules.transformer.multi_head_attention import MultiHeadAttention
