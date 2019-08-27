@@ -48,7 +48,7 @@ class GRUDecoder(nn.Module):
         hidden : ``torch.FloatTensor``, required.
             Initial hidden tensor of shape (batch_size, hidden_size)
         target : ``torch.LongTensor``, optional (default = None)
-            Target tokens tensor of shape (batch_size, length)
+            Target tokens tensor of shape (batch_size, length), `target` must contain <sos> and <eos> token.
         attn_value : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
         attn_mask : ``torch.LongTensor``, optional (default = None)
@@ -66,20 +66,23 @@ class GRUDecoder(nn.Module):
             assert target is not None
             num_steps = target.size(1) - 1
 
-        last_prediction = hidden.new_full((hidden.size(0),), fill_value=self.start_index).long()
         step_logits = []
-        for timestep in range(num_steps):
-            if not is_training and (last_prediction == self.end_index).all():
-                break
-            if is_training:
+        if is_training:
+            for timestep in range(num_steps):
                 input = target[:, timestep]
-            else:
+                output, hidden = self._take_step(input, hidden, attn_value, attn_mask)
+                step_logits.append(output.unsqueeze(1))
+        else:
+            last_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
+            for timestep in range(num_steps):
+                if (last_prediction == self.end_index).all():
+                    break
                 input = last_prediction
-            # prob of shape (batch_size, vocab_size)
-            output, hidden = self._take_step(input, hidden, attn_value, attn_mask)
-            # shape: (batch_size,)
-            last_prediction = torch.argmax(output, dim=-1)
-            step_logits.append(output.unsqueeze(1))
+                # `output` of shape (batch_size, vocab_size)
+                output, hidden = self._take_step(input, hidden, attn_value, attn_mask)
+                # shape: (batch_size,)
+                last_prediction = torch.argmax(output, dim=-1)
+                step_logits.append(output.unsqueeze(1))
 
         logits = torch.cat(step_logits, dim=1)
         return logits
@@ -210,7 +213,7 @@ class LSTMDecoder(nn.Module):
         hidden : ``torch.FloatTensor``, required.
             Initial hidden tensor of shape (batch_size, hidden_size)
         target : ``torch.LongTensor``, optional (default = None)
-            Target tokens tensor of shape (batch_size, length)
+            Target tokens tensor of shape (batch_size, length), `target` must contain <sos> and <eos> token.
         attn_value : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
         attn_mask : ``torch.LongTensor``, optional (default = None)
@@ -228,24 +231,26 @@ class LSTMDecoder(nn.Module):
             assert target is not None
             num_steps = target.size(1) - 1
 
-        last_prediction = hidden.new_full((hidden.size(0),), fill_value=self.start_index).long()
         cell_state = hidden.new_full((hidden.size(0), self.hidden_size), fill_value=0.0)
         hidden_tuple = (hidden, cell_state)
 
         step_logits = []
-        for timestep in range(num_steps):
-            if not is_training and (last_prediction == self.end_index).all():
-                break
-            if is_training:
+        if is_training:
+            for timestep in range(num_steps):
                 input = target[:, timestep]
-            else:
+                output, hidden = self._take_step(input, hidden_tuple, attn_value, attn_mask)
+                step_logits.append(output.unsqueeze(1))
+        else:
+            last_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
+            for timestep in range(num_steps):
+                if (last_prediction == self.end_index).all():
+                    break
                 input = last_prediction
-            # prob of shape (batch_size, vocab_size)
-            output, hidden_tuple = self._take_step(input, hidden_tuple, attn_value, attn_mask)
-            # shape: (batch_size,)
-            last_prediction = torch.argmax(output, dim=-1)
-            step_logits.append(output.unsqueeze(1))
-
+                # `output` of shape (batch_size, vocab_size)
+                output, hidden = self._take_step(input, hidden_tuple, attn_value, attn_mask)
+                # shape: (batch_size,)
+                last_prediction = torch.argmax(output, dim=-1)
+                step_logits.append(output.unsqueeze(1))
         logits = torch.cat(step_logits, dim=1)
         return logits
 
