@@ -1,11 +1,13 @@
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import math
 import numpy as np
 
 from modules.utils import create_position_embedding, sequence_norm
 from modules.transformer import MultiHeadAttention
 from modules.transformer.transformer_ffn import TransformerFFN
+from modules.beam_search import BeamSearch
 
 
 class TransformerDecoder(nn.Module):
@@ -97,35 +99,111 @@ class TransformerDecoder(nn.Module):
             )
         self.output_layer = output_layer
 
-    def forward(self, input, encoder_output, encoder_mask, is_training=True):
+    def forward(self, encoder_output, encoder_mask, target=None, num_steps=50, is_training=True):
         """
         forward
 
         :param
-        input : ``torch.FloatTensor``, required.
-            A ``torch.FloatTensor`` of shape (batch_size, seq_len, embedding_size)
         encoder_output : ``torch.FloatTensor``, required.
             A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size)
-        encoder_mask : ``torch.ByteTensor``, required.
-            A ``torch.ByteTensor`` of shape (batch_size, enc_len)
+        encoder_mask : ``torch.LongTensor``, required.
+            A ``torch.LongTensor`` of shape (batch_size, enc_len)
+        target : ``torch.LongTensor``, optional (default = None)
+            Target tokens tensor of shape (batch_size, seq_len), `target` must contain <sos> and <eos> token.
         is_training : ``bool``, optional (default = True)
             If `True`, decode with a fixed, true target sequence.
         :return:
         tensor : ``torch.LongTensor``
             Return a tensor of shape (batch_size, seq_len),
         """
-        seq_len = input.size(1)
-        positions = torch.arange(seq_len).unsqueeze(0)
-        tensor = self.embedding(input)
+        if is_training:
+            assert target is not None
+            seq_len = target.size(1)
+            positions = torch.arange(seq_len-1).unsqueeze(0)
+            tensor = self.embedding(target[:, :-1].contiguous())
+            if self.embedding_scale:
+                tensor = tensor / np.sqrt(self.dim)
+            tensor = tensor + self.position_embedding(positions).expand_as(tensor)
+            tensor = self.dropout(tensor)  # --dropout
+            for layer in self.layers:
+                tensor = layer(tensor, encoder_output, encoder_mask, is_training)
+            logits = self.output_layer(tensor)
+        else:
+            last_prediction = encoder_output.new_full((encoder_output.size(0),), fill_value=self.start_index).long()
+            previous_input = None
+            step_logits = []
+            for timestep in range(num_steps):
+                if (last_prediction == self.end_index).all():
+                    break
+                input = last_prediction
+                output, previous_input = self._take_step(input, encoder_output, encoder_mask, previous_input)
+                last_prediction = torch.argmax(output, dim=-1)
+                step_logits.append(output)
+            logits = torch.cat(step_logits, dim=1)
+
+        return logits
+
+    def _take_step(self, input, encoder_output, encoder_mask, previous_input=None):
+        tensor = self.embedding(input).unsqueeze(1)
         if self.embedding_scale:
             tensor = tensor / np.sqrt(self.dim)
-        tensor = tensor + self.position_embedding(positions).expand_as(tensor)
-        tensor = self.dropout(tensor)  # --dropout
-
+        if previous_input is not None:
+            tensor = tensor + self.position_embedding(previous_input.size(1)).expand_as(tensor)
+            decoder_input = torch.cat([previous_input, tensor], dim=1)
+        else:
+            tensor = tensor + self.position_embedding(0).expand_as(tensor)
+            decoder_input = tensor
         for layer in self.layers:
-            tensor = layer(tensor, encoder_output, encoder_mask, is_training)
-        
-        return tensor
+            output = layer(decoder_input, encoder_output, encoder_mask, is_training=False)
+        output = self.output_layer(output)
+        return output, decoder_input
+
+    def forward_beam_search(
+            self, encoder_output, encoder_mask,
+            num_steps=50, beam_size=4,per_node_beam_size=4,
+    ):
+        """
+        Decoder forward using beam search at inference stage
+
+        :param
+        beam_size : ``int``, optional (default = 4)
+        per_node_beam_size : ``int``, optional (default = 4)
+
+        :return
+        all_top_k_predictions : ``torch.LongTensor``
+            A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
+            containing k top sequences in descending order along dim 1.
+        log_probabilities : ``torch.FloatTensor``
+            A ``torch.FloatTensor``  of shape (batch_size, beam_size),
+            Log probabilities of k top sequences.
+        """
+
+        beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
+        start_prediction = encoder_output.new_full((encoder_output.size(0),), fill_value=self.start_index).long()
+
+        state = {'encoder_output': encoder_output, 'encoder_mask': encoder_mask}
+        all_top_k_predictions, log_probabilities = \
+            beam_search.search(start_prediction, state, self._beam_step)
+        return all_top_k_predictions, log_probabilities
+
+    def _beam_step(self, input, state):
+        encoder_output = state['encoder_output']
+        encoder_mask = state['encoder_mask']
+        tensor = self.embedding(input).unsqueeze(1)
+        if self.embedding_scale:
+            tensor = tensor / np.sqrt(self.dim)
+        if 'previous_input' in state:
+            previous_input = state['previous_input']
+            tensor = tensor + self.position_embedding(previous_input.size(1)).expand_as(tensor)
+            decoder_input = torch.cat([previous_input, tensor.expand(previous_input.size(0), -1, -1)], dim=1)
+        else:
+            tensor = tensor + self.position_embedding(0).expand_as(tensor)
+            decoder_input = tensor
+        state['previous_input'] = decoder_input
+        for layer in self.layers:
+            output = layer(decoder_input, encoder_output, encoder_mask, is_training=False)
+        log_prob = F.log_softmax(self.output_layer(output), dim=-1)
+        return log_prob, state
 
 
 class TransformerDecoderLayer(nn.Module):
