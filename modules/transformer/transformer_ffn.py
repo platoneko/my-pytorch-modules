@@ -8,12 +8,10 @@ class TransformerFFN(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
         self.lin1 = nn.Linear(model_dim, hidden_size)
         self.lin2 = nn.Linear(hidden_size, model_dim)
-        nn.init.xavier_uniform_(self.lin1.weight)
-        nn.init.xavier_uniform_(self.lin2.weight)
-        # TODO: initialize biases to 0
+        self.norm = nn.LayerNorm(model_dim)
+        self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, x):
-        x = F.relu(self.lin1(x))
-        x = self.dropout(x)  # --relu-dropout
-        x = self.lin2(x)
-        return x
+        inter = self.dropout(F.relu(self.lin1(self.norm(x))))
+        output = self.dropout(self.lin2(inter))
+        return output + x

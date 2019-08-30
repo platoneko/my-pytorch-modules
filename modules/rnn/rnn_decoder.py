@@ -29,15 +29,15 @@ class GRUDecoder(nn.Module):
         self.attention = attention
         self.dropout = dropout
 
-        self.rnn = nn.GRUCell(self.input_size, self.hidden_size)
+        self.rnn = nn.GRUCell(input_size, hidden_size)
         self.output_layer = output_layer
 
     def forward(
             self,
             hidden,
             target=None,
-            attn_value=None,
-            attn_mask=None,
+            encoder_output=None,
+            encoder_mask=None,
             num_steps=50,
             is_training=False
     ):
@@ -49,9 +49,9 @@ class GRUDecoder(nn.Module):
             Initial hidden tensor of shape (batch_size, hidden_size)
         target : ``torch.LongTensor``, optional (default = None)
             Target tokens tensor of shape (batch_size, length), `target` must contain <sos> and <eos> token.
-        attn_value : ``torch.FloatTensor``, optional (default = None)
+        encoder_output : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        attn_mask : ``torch.LongTensor``, optional (default = None)
+        encoder_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
         is_training : ``bool``, optional (default = False).
 
@@ -60,7 +60,7 @@ class GRUDecoder(nn.Module):
             A ``torch.FloatTensor`` of shape (batch_size, num_steps, vocab_size)
         """
         if self.attention is not None:
-            assert attn_value is not None
+            assert encoder_output is not None
 
         if is_training:
             assert target is not None
@@ -70,7 +70,7 @@ class GRUDecoder(nn.Module):
         if is_training:
             for timestep in range(num_steps):
                 input = target[:, timestep]
-                output, hidden = self._take_step(input, hidden, attn_value, attn_mask)
+                output, hidden = self._take_step(input, hidden, encoder_output, encoder_mask)
                 step_logits.append(output.unsqueeze(1))
         else:
             last_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
@@ -79,7 +79,7 @@ class GRUDecoder(nn.Module):
                     break
                 input = last_prediction
                 # `output` of shape (batch_size, vocab_size)
-                output, hidden = self._take_step(input, hidden, attn_value, attn_mask)
+                output, hidden = self._take_step(input, hidden, encoder_output, encoder_mask)
                 # shape: (batch_size,)
                 last_prediction = torch.argmax(output, dim=-1)
                 step_logits.append(output.unsqueeze(1))
@@ -87,14 +87,14 @@ class GRUDecoder(nn.Module):
         logits = torch.cat(step_logits, dim=1)
         return logits
 
-    def _take_step(self, input, hidden, attn_value=None, attn_mask=None):
+    def _take_step(self, input, hidden, encoder_output=None, encoder_mask=None):
         # shape: (batch_size, input_size)
         embedded_input = self.embedding(input)
         rnn_input = embedded_input
         if self.attention is not None:
             # shape: (batch_size, num_rows)
-            attn_score = self.attention(hidden, attn_value, attn_mask)
-            attn_input = attn_score.unsqueeze(1).matmul(attn_value).squeeze(1)
+            attn_score = self.attention(hidden, encoder_output, encoder_mask)
+            attn_input = attn_score.unsqueeze(1).matmul(encoder_output).squeeze(1)
             # shape: (batch_size, input_size + attn_size)
             rnn_input = torch.cat([embedded_input, attn_input], dim=-1)
         next_hidden = self.rnn(rnn_input, hidden)
@@ -102,11 +102,11 @@ class GRUDecoder(nn.Module):
         output = self.output_layer(next_hidden)
         return output, next_hidden
 
-    def forward_beam_search(
+    def beam_forward(
             self,
             hidden,
-            attn_value=None,
-            attn_mask=None,
+            encoder_output=None,
+            encoder_mask=None,
             num_steps=50,
             beam_size=4,
             per_node_beam_size=4,
@@ -119,9 +119,9 @@ class GRUDecoder(nn.Module):
             Initial hidden tensor of shape (batch_size, hidden_size)
         end_index : ``int``, required.
             Vocab index of <eos> token.
-        attn_value : ``torch.FloatTensor``, optional (default = None)
+        encoder_output : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        attn_mask : ``torch.LongTensor``, optional (default = None)
+        encoder_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
         beam_size : ``int``, optional (default = 4)
         per_node_beam_size : ``int``, optional (default = 4)
@@ -136,15 +136,15 @@ class GRUDecoder(nn.Module):
         """
 
         if self.attention is not None:
-            assert attn_value is not None
+            assert encoder_output is not None
 
         beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
         start_prediction = hidden.new_full((hidden.size(0),), fill_value=self.start_index).long()
 
         state = {'hidden': hidden}
         if self.attention:
-            state['attn_value'] = attn_value
-            state['attn_mask'] = attn_mask
+            state['encoder_output'] = encoder_output
+            state['encoder_mask'] = encoder_mask
         all_top_k_predictions, log_probabilities = \
             beam_search.search(start_prediction, state, self._beam_step)
         return all_top_k_predictions, log_probabilities
@@ -155,11 +155,11 @@ class GRUDecoder(nn.Module):
         rnn_input = embedded_input
         hidden = state['hidden']
         if self.attention is not None:
-            attn_value = state['attn_value']
-            attn_mask = state['attn_mask']
+            encoder_output = state['encoder_output']
+            encoder_mask = state['encoder_mask']
             # shape: (group_size, num_rows)
-            attn_score = self.attention(hidden, attn_value, attn_mask)
-            attn_input = attn_score.unsqueeze(1).matmul(attn_value).squeeze(1)
+            attn_score = self.attention(hidden, encoder_output, encoder_mask)
+            attn_input = attn_score.unsqueeze(1).matmul(encoder_output).squeeze(1)
             # shape: (group_size, input_size + attn_size)
             rnn_input = torch.cat([embedded_input, attn_input], dim=-1)
         next_hidden = self.rnn(rnn_input, hidden)
@@ -194,15 +194,15 @@ class LSTMDecoder(nn.Module):
         self.attention = attention
         self.dropout = dropout
 
-        self.rnn = nn.LSTMCell(self.input_size, self.hidden_size)
+        self.rnn = nn.LSTMCell(input_size, hidden_size)
         self.output_layer = output_layer
 
     def forward(
             self,
             hidden,
             target=None,
-            attn_value=None,
-            attn_mask=None,
+            encoder_output=None,
+            encoder_mask=None,
             num_steps=50,
             is_training=False
     ):
@@ -214,9 +214,9 @@ class LSTMDecoder(nn.Module):
             Initial hidden tensor of shape (batch_size, hidden_size)
         target : ``torch.LongTensor``, optional (default = None)
             Target tokens tensor of shape (batch_size, length), `target` must contain <sos> and <eos> token.
-        attn_value : ``torch.FloatTensor``, optional (default = None)
+        encoder_output : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        attn_mask : ``torch.LongTensor``, optional (default = None)
+        encoder_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
         is_training : ``bool``, optional (default = False).
 
@@ -225,7 +225,7 @@ class LSTMDecoder(nn.Module):
             A ``torch.FloatTensor`` of shape (batch_size, num_steps, vocab_size)
         """
         if self.attention is not None:
-            assert attn_value is not None
+            assert encoder_output is not None
 
         if is_training:
             assert target is not None
@@ -238,7 +238,7 @@ class LSTMDecoder(nn.Module):
         if is_training:
             for timestep in range(num_steps):
                 input = target[:, timestep]
-                output, hidden = self._take_step(input, hidden_tuple, attn_value, attn_mask)
+                output, hidden = self._take_step(input, hidden_tuple, encoder_output, encoder_mask)
                 step_logits.append(output.unsqueeze(1))
         else:
             last_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
@@ -247,21 +247,21 @@ class LSTMDecoder(nn.Module):
                     break
                 input = last_prediction
                 # `output` of shape (batch_size, vocab_size)
-                output, hidden = self._take_step(input, hidden_tuple, attn_value, attn_mask)
+                output, hidden = self._take_step(input, hidden_tuple, encoder_output, encoder_mask)
                 # shape: (batch_size,)
                 last_prediction = torch.argmax(output, dim=-1)
                 step_logits.append(output.unsqueeze(1))
         logits = torch.cat(step_logits, dim=1)
         return logits
 
-    def _take_step(self, input, hidden_tuple, attn_value=None, attn_mask=None):
+    def _take_step(self, input, hidden_tuple, encoder_output=None, encoder_mask=None):
         # shape: (batch_size, input_size)
         embedded_input = self.embedding(input)
         rnn_input = embedded_input
         if self.attention is not None:
             # shape: (batch_size, num_rows)
-            attn_score = self.attention(hidden_tuple[0], attn_value, attn_mask)
-            attn_input = attn_score.unsqueeze(1).matmul(attn_value).squeeze(1)
+            attn_score = self.attention(hidden_tuple[0], encoder_output, encoder_mask)
+            attn_input = attn_score.unsqueeze(1).matmul(encoder_output).squeeze(1)
             # shape: (batch_size, input_size + attn_size)
             rnn_input = torch.cat([embedded_input, attn_input], dim=-1)
         next_hidden, next_cell_state = self.rnn(rnn_input, hidden_tuple)
@@ -269,11 +269,11 @@ class LSTMDecoder(nn.Module):
         output = self.output_layer(next_hidden)
         return output, (next_hidden, next_cell_state)
 
-    def forward_beam_search(
+    def beam_forward(
             self,
             hidden,
-            attn_value=None,
-            attn_mask=None,
+            encoder_output=None,
+            encoder_mask=None,
             num_steps=50,
             beam_size=4,
             per_node_beam_size=4,
@@ -286,9 +286,9 @@ class LSTMDecoder(nn.Module):
             Initial hidden tensor of shape (batch_size, hidden_size)
         end_index : ``int``, required.
             Vocab index of <eos> token.
-        attn_value : ``torch.FloatTensor``, optional (default = None)
+        encoder_output : ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        attn_mask : ``torch.LongTensor``, optional (default = None)
+        encoder_mask : ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, num_rows)
         beam_size : ``int``, optional (default = 4)
         per_node_beam_size : ``int``, optional (default = 4)
@@ -302,7 +302,7 @@ class LSTMDecoder(nn.Module):
             Log probabilities of k top sequences.
         """
         if self.attention is not None:
-            assert attn_value is not None
+            assert encoder_output is not None
 
         beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
         start_prediction = hidden.new_full((hidden.size(0),), fill_value=self.start_index).long()
@@ -310,8 +310,8 @@ class LSTMDecoder(nn.Module):
 
         state = {'hidden': hidden, 'cell_state': cell_state}
         if self.attention:
-            state['attn_value'] = attn_value
-            state['attn_mask'] = attn_mask
+            state['encoder_output'] = encoder_output
+            state['encoder_mask'] = encoder_mask
         all_top_k_predictions, log_probabilities = \
             beam_search.search(start_prediction, state, self._beam_step)
         return all_top_k_predictions, log_probabilities
@@ -323,11 +323,11 @@ class LSTMDecoder(nn.Module):
         hidden = state['hidden']
         cell_state = state['cell_state']
         if self.attention is not None:
-            attn_value = state['attn_value']
-            attn_mask = state['attn_mask']
+            encoder_output = state['encoder_output']
+            encoder_mask = state['encoder_mask']
             # shape: (group_size, num_rows)
-            attn_score = self.attention(hidden, attn_value, attn_mask)
-            attn_input = attn_score.unsqueeze(1).matmul(attn_value).squeeze(1)
+            attn_score = self.attention(hidden, encoder_output, encoder_mask)
+            attn_input = attn_score.unsqueeze(1).matmul(encoder_output).squeeze(1)
             # shape: (group_size, input_size + attn_size)
             rnn_input = torch.cat([embedded_input, attn_input], dim=-1)
         next_hidden, next_cell_state = self.rnn(rnn_input, (hidden, cell_state))

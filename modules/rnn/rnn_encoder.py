@@ -22,13 +22,15 @@ class GRUEncoder(nn.Module):
     A GRU recurrent neural network encoder.
     """
 
-    def __init__(self,
-                 input_size,
-                 hidden_size,
-                 embedding,
-                 num_layers=1,
-                 bidirectional=True,
-                 dropout=0.0):
+    def __init__(
+            self,
+            input_size,
+            hidden_size,
+            embedding,
+            num_layers=1,
+            bidirectional=True,
+            dropout=0.0
+    ):
         super().__init__()
 
         self.input_size = input_size
@@ -39,12 +41,12 @@ class GRUEncoder(nn.Module):
         self.dropout = dropout
 
         self.rnn = nn.GRU(
-            input_size=self.input_size,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
             batch_first=True,
-            dropout=self.dropout if self.num_layers > 1 else 0,
-            bidirectional=self.bidirectional
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=bidirectional
         )
 
     def forward(self, input, hidden=None):
@@ -134,12 +136,12 @@ class LSTMEncoder(nn.Module):
         self.dropout = dropout
 
         self.rnn = nn.LSTM(
-            input_size=self.input_size,
-            hidden_size=self.hidden_size,
-            num_layers=self.num_layers,
+            input_size=input_size,
+            hidden_size=hidden_size,
+            num_layers=num_layers,
             batch_first=True,
-            dropout=self.dropout if self.num_layers > 1 else 0,
-            bidirectional=self.bidirectional
+            dropout=dropout if num_layers > 1 else 0,
+            bidirectional=bidirectional
         )
 
     def forward(self, input, hidden_tuple=None):

@@ -20,7 +20,7 @@ def get_sequence_mask(lengths, max_len=None):
     mask = mask.repeat(1, *lengths.size(), 1)
     mask = mask.squeeze(0)
     mask = mask.lt(lengths.unsqueeze(-1))
-    # mask = mask.repeat(*lengths.size(), 1).lt(lengths.unsqueeze(-1))
+    #mask = mask.repeat(*lengths.size(), 1).lt(lengths.unsqueeze(-1))
     return mask
 
 
@@ -37,10 +37,82 @@ def masked_softmax(vector, mask, dim=-1,
     result : ``torch.FloatTensor``
         A ``torch.FloatTensor`` of shape (B, *, N)
     """
-    mask = mask.float()
     masked_vector = vector.masked_fill((1 - mask).byte(), mask_fill_value)
     result = torch.nn.functional.softmax(masked_vector, dim=dim)
     return result
+
+
+def masked_max(vector, mask, dim, keepdim=False, mask_fill_value=-1e32):
+    """
+    To calculate max along certain dimensions on masked values
+
+    :param
+    vector : ``torch.Tensor``
+        The vector to calculate max.
+    mask : ``torch.Tensor``
+        The mask of the vector. It must be broadcastable with vector.
+    dim : ``int``
+        The dimension to calculate mean
+    keepdim : ``bool``
+        Whether to keep dimension
+
+
+    :return
+    A ``torch.Tensor`` of including the max values.
+    """
+    one_minus_mask = (1.0 - mask).byte()
+    replaced_vector = vector.masked_fill(one_minus_mask, mask_fill_value)
+    value_sum, _ = torch.max(replaced_vector, dim=dim, keepdim=keepdim)
+    return value_sum
+
+
+def masked_sum(vector, mask, dim, keepdim=False):
+    """
+    To calculate sum along certain dimensions on masked values
+
+    :param
+    vector : ``torch.Tensor``
+        The vector to calculate mean.
+    mask : ``torch.Tensor``
+        The mask of the vector. It must be broadcastable with vector.
+    dim : ``int``
+        The dimension to calculate mean
+    keepdim : ``bool``
+        Whether to keep dimension
+
+    :return
+    A ``torch.Tensor`` of including the sum values.
+    """
+    one_minus_mask = (1.0 - mask).byte()
+    replaced_vector = vector.masked_fill(one_minus_mask, 0.0)
+    value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
+    return value_sum
+
+
+def masked_mean(vector, mask, dim, keepdim=False, eps=1e-8):
+    """
+    To calculate mean along certain dimensions on masked values
+
+    :param
+    vector : ``torch.Tensor``
+        The vector to calculate mean.
+    mask : ``torch.Tensor``
+        The mask of the vector. It must be broadcastable with vector.
+    dim : ``int``
+        The dimension to calculate mean
+    keepdim : ``bool``
+        Whether to keep dimension
+    eps : ``float``
+        A small value to avoid zero division problem.
+
+    :return
+    A ``torch.Tensor`` of including the mean values.
+    """
+    one_minus_mask = (1.0 - mask).byte()
+    replaced_vector = vector.masked_fill(one_minus_mask, 0.0)
+    value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
+    value_count = torch.sum(mask.float(), dim=dim, keepdim=keepdim)
+    return value_sum / value_count.clamp(min=eps)
 
 
 def sequence_cross_entropy_with_logits(logits,
@@ -153,11 +225,3 @@ def create_position_embedding(n_pos, dim, out):
     out[:, 1::2] = torch.FloatTensor(np.cos(position_enc))
     out.detach_()
     out.requires_grad = False
-
-
-def sequence_norm(tensor, norm_layer):
-    """
-    Broadcast norm for sequence tensor
-    """
-    size = tensor.size()
-    return norm_layer(tensor.view(-1, size[-1])).view(size)

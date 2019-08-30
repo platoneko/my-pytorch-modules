@@ -4,10 +4,10 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-from modules.utils import create_position_embedding, sequence_norm
-from modules.transformer import MultiHeadAttention
+from modules.transformer.multi_head_attention import MultiHeadAttention
 from modules.transformer.transformer_ffn import TransformerFFN
 from modules.beam_search import BeamSearch
+from modules.utils import *
 
 
 class TransformerDecoder(nn.Module):
@@ -22,6 +22,8 @@ class TransformerDecoder(nn.Module):
             embedding_size,
             ffn_size,
             embedding,
+            start_index,
+            end_index,
             output_layer,
             dropout=0.0,
             attention_dropout=None,
@@ -66,7 +68,8 @@ class TransformerDecoder(nn.Module):
         self.num_heads = num_heads
         self.dim = embedding_size
         self.embedding_scale = embedding_scale
-        self.dropout = nn.Dropout(p=dropout)  # --dropout
+        self.start_index = start_index
+        self.end_index = end_index
         if relu_dropout is None:
             relu_dropout = dropout
         if attention_dropout is None:
@@ -88,7 +91,7 @@ class TransformerDecoder(nn.Module):
 
         # build the model
         self.layers = nn.ModuleList()
-        for _ in range(self.n_layers):
+        for _ in range(self.num_layers):
             self.layers.append(
                 TransformerDecoderLayer(
                     num_heads, embedding_size, ffn_size,
@@ -98,6 +101,7 @@ class TransformerDecoder(nn.Module):
                 )
             )
         self.output_layer = output_layer
+        self.norm = nn.LayerNorm(embedding_size)
 
     def forward(self, encoder_output, encoder_mask, target=None, num_steps=50, is_training=True):
         """
@@ -119,14 +123,14 @@ class TransformerDecoder(nn.Module):
         if is_training:
             assert target is not None
             seq_len = target.size(1)
-            positions = torch.arange(seq_len-1).unsqueeze(0)
+            positions = get_range_vector(seq_len-1, get_device_of(encoder_output))
             tensor = self.embedding(target[:, :-1].contiguous())
             if self.embedding_scale:
                 tensor = tensor / np.sqrt(self.dim)
             tensor = tensor + self.position_embedding(positions).expand_as(tensor)
-            tensor = self.dropout(tensor)  # --dropout
             for layer in self.layers:
                 tensor = layer(tensor, encoder_output, encoder_mask, is_training)
+            tensor = self.norm(tensor)
             logits = self.output_layer(tensor)
         else:
             last_prediction = encoder_output.new_full((encoder_output.size(0),), fill_value=self.start_index).long()
@@ -148,17 +152,20 @@ class TransformerDecoder(nn.Module):
         if self.embedding_scale:
             tensor = tensor / np.sqrt(self.dim)
         if previous_input is not None:
-            tensor = tensor + self.position_embedding(previous_input.size(1)).expand_as(tensor)
+            position = input.new_full((input.size(0), 1), fill_value=previous_input.size(1))
+            tensor = tensor + self.position_embedding(position)
             decoder_input = torch.cat([previous_input, tensor], dim=1)
         else:
-            tensor = tensor + self.position_embedding(0).expand_as(tensor)
+            position = input.new_full((input.size(0), 1), fill_value=0)
+            tensor = tensor + self.position_embedding(position)
             decoder_input = tensor
         for layer in self.layers:
             output = layer(decoder_input, encoder_output, encoder_mask, is_training=False)
+        output = self.norm(output)
         output = self.output_layer(output)
         return output, decoder_input
 
-    def forward_beam_search(
+    def beam_forward(
             self, encoder_output, encoder_mask,
             num_steps=50, beam_size=4,per_node_beam_size=4,
     ):
@@ -194,14 +201,17 @@ class TransformerDecoder(nn.Module):
             tensor = tensor / np.sqrt(self.dim)
         if 'previous_input' in state:
             previous_input = state['previous_input']
-            tensor = tensor + self.position_embedding(previous_input.size(1)).expand_as(tensor)
+            position = input.new_full((input.size(0), 1), fill_value=previous_input.size(1))
+            tensor = tensor + self.position_embedding(position)
             decoder_input = torch.cat([previous_input, tensor.expand(previous_input.size(0), -1, -1)], dim=1)
         else:
-            tensor = tensor + self.position_embedding(0).expand_as(tensor)
+            position = input.new_full((input.size(0), 1), fill_value=0)
+            tensor = tensor + self.position_embedding(position)
             decoder_input = tensor
         state['previous_input'] = decoder_input
         for layer in self.layers:
             output = layer(decoder_input, encoder_output, encoder_mask, is_training=False)
+        output = self.norm(output)
         log_prob = F.log_softmax(self.output_layer(output), dim=-1)
         return log_prob, state
 
@@ -234,9 +244,8 @@ class TransformerDecoderLayer(nn.Module):
         self.norm2 = nn.LayerNorm(embedding_size)
 
         self.ffn = TransformerFFN(embedding_size, ffn_size, dropout=relu_dropout)
-        self.norm3 = nn.LayerNorm(embedding_size)
 
-    def forward(self, x, encoder_output, encoder_mask, is_training):
+    def forward(self, input, encoder_output, encoder_mask, is_training):
         """
 
         :param x: ``torch.FloatTensor``, required.
@@ -249,42 +258,26 @@ class TransformerDecoderLayer(nn.Module):
         :return:
         """
 
-        residual = x
-
+        input_norm = self.norm1(input)
         if is_training:
-            decoder_mask = self._create_selfattn_mask(x)
+            decoder_mask = self._create_selfattn_mask(input)
             # first self attn
             # don't peak into the future!
-            x = self.self_attention(x, x, x, mask=decoder_mask)
-            x = self.dropout(x)  # --dropout
-            x = x + residual
-            x = sequence_norm(x, self.norm1)  # (batch_size, seq_len, embedding_size)
+            query = self.self_attention(input_norm, input_norm, input_norm, mask=decoder_mask)
         else:
-            x = self.self_attention(x[:, -1, :].unsqueeze(1), x, x)
-            x = self.dropout(x)
-            x = x + residual
-            x = sequence_norm(x, self.norm1)  # (batch_size, 1, embedding_size)
+            query = self.self_attention(input_norm[:, -1, :].unsqueeze(1), input_norm, input_norm)
 
-        residual = x
-
-        x = self.encoder_attention(
-            query=x,
+        query = self.dropout(query) + input
+        query_norm = self.norm2(query)
+        inter = self.encoder_attention(
+            query=query_norm,
             key=encoder_output,
             value=encoder_output,
             mask=encoder_mask
         )
-        x = self.dropout(x)  # --dropout
-        x = residual + x
-        x = sequence_norm(x, self.norm2)
+        output = self.ffn(self.dropout(inter) + query)
 
-        # finally the ffn
-        residual = x
-        x = self.ffn(x)
-        x = self.dropout(x)  # --dropout
-        x = residual + x
-        x = sequence_norm(x, self.norm3)
-
-        return x
+        return output
 
     def _create_selfattn_mask(self, x):
         # figure out how many timesteps we need
