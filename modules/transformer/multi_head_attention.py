@@ -19,23 +19,19 @@ class MultiHeadAttention(nn.Module):
 
     def forward(self, query, key, value, mask=None):
         """
-        forward
 
-        :param
-        query : ``torch.FloatTensor``, required.
+        :param query: ``torch.FloatTensor``, required.
             A ``torch.FloatTensor`` of shape (batch_size, query_len, dim)
-        key : ``torch.FloatTensor``, required.
+        :param key: ``torch.FloatTensor``, required.
             A ``torch.FloatTensor`` of shape (batch_size, key_len, dim)
-        value : ``torch.FloatTensor``, required.
+        :param value: ``torch.FloatTensor``, required.
             A ``torch.FloatTensor`` of shape (batch_size, value_len, dim), (key_len == value_len)
-        mask : ``torch.LongTensor``, optional (default = None)
+        :param mask: ``torch.LongTensor``, optional (default = None)
             A ``torch.LongTensor`` of shape (batch_size, key_len) (self-attention) or
-            (batch_size, query_len, key_len) (enc-attention)
-        :return
-        outputs : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (batch_size, query_len, dim), (not padding)
+        (batch_size, query_len, key_len) (enc-attention)
+        :return:
+            outputs: ``torch.FloatTensor`` of shape (batch_size, query_len, dim), (not padding)
         """
-
         batch_size, query_len, dim = query.size()
         assert dim == self.dim, \
             f'Dimensions do not match: {dim} query vs {self.dim} configured'
@@ -77,13 +73,13 @@ class MultiHeadAttention(nn.Module):
         attn_score = F.softmax(dot_prod / scale, dim=-1)
         attn_score = self.attn_dropout(attn_score)  # --attention-dropout
 
-        outputs = attn_score.bmm(v)
-        outputs = outputs.\
+        output = attn_score.bmm(v)
+        output = output.\
             view(batch_size, num_heads, query_len, dim_per_head).\
             transpose(1, 2).\
             contiguous().\
             view(batch_size, query_len, dim)
 
-        outputs = self.out_lin(outputs)
+        output = self.out_lin(output)
 
-        return outputs
+        return output

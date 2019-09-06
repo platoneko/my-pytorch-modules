@@ -13,15 +13,15 @@ class SequenceNLLLoss(_Loss):
         self.register_buffer('weight', weight)
         self.reduction = reduction
 
-    def forward(self, inputs, targets, reduction=True):
+    def forward(self, input, target, reduction=True):
         """
         inputs: (batch_size, max_len, vocab_size)
         targets: (batch_size, max_len)
         """
-        batch_size = inputs.size(0)
+        batch_size = input.size(0)
         nll = F.nll_loss(
-            input=inputs.reshape(-1, inputs.size(-1)),
-            target=targets.reshape(-1),
+            input=input.reshape(-1, input.size(-1)),
+            target=target.reshape(-1),
             weight=self.weight,
             reduction='none'
         )
@@ -30,7 +30,7 @@ class SequenceNLLLoss(_Loss):
         if reduction:
             if self.reduction == 'mean':
                 if self.padding_idx is not None:
-                    word_cnt = targets.ne(self.padding_idx).float().sum(dim=1)
+                    word_cnt = target.ne(self.padding_idx).float().sum(dim=1)
                     nll = nll / word_cnt
                     nll = nll.mean()
             elif self.reduction == 'sum':
@@ -50,15 +50,15 @@ class SequenceCrossEntropy(_Loss):
         self.padding_idx = padding_idx
         self.reduction = reduction
 
-    def forward(self, inputs, targets, reduction=True):
+    def forward(self, input, target, reduction=True):
         """
         inputs: (batch_size, max_len, vocab_size)
         targets: (batch_size, max_len)
         """
-        batch_size = inputs.size(0)
+        batch_size = input.size(0)
         cross_entropy = F.cross_entropy(
-            input=inputs.reshape(-1, inputs.size(-1)),
-            target=targets.reshape(-1),
+            input=input.reshape(-1, input.size(-1)),
+            target=target.reshape(-1),
             weight=self.weight,
             reduction='none'
         )
@@ -67,7 +67,7 @@ class SequenceCrossEntropy(_Loss):
         if reduction:
             if self.reduction == 'mean':
                 if self.padding_idx is not None:
-                    word_cnt = targets.ne(self.padding_idx).float().sum(dim=1)
+                    word_cnt = target.ne(self.padding_idx).float().sum(dim=1)
                     cross_entropy = cross_entropy / word_cnt
                     cross_entropy = cross_entropy.mean()
             elif self.reduction == 'sum':

@@ -6,13 +6,15 @@ import math
 def get_sequence_mask(lengths, max_len=None):
     """
     Creates a boolean mask from sequence lengths.
-    :param
-    lengths : ``torch.LongTensor``, required.
+
+    :param lengths: ``torch.LongTensor``, required.
         A ``torch.LongTensor`` of shape (B,) which contains a batch of sequence lengths.
-    :return
-    mask : ``torch.ByteTensor``
+    :param max_len: ``int``, optional (default = None)
+    :return:
+        mask : ``torch.ByteTensor``
         A ``torch.ByteTensor`` of shape (B, len)
     """
+
     if max_len is None:
         max_len = lengths.max().item()
     mask = torch.arange(0, max_len, dtype=torch.long).type_as(lengths)
@@ -27,16 +29,17 @@ def get_sequence_mask(lengths, max_len=None):
 def masked_softmax(vector, mask, dim=-1,
                    mask_fill_value=-1e32):
     """
-    :param
-    vector : ``torch.FloatTensor``, required.
-        A ``torch.FloatTensor`` of shape (B, *, N)
-    mask : ``torch.LongTensor``, required.
-        A ``torch.LongTensor`` of shape (B, *, N)
 
-    :return
-    result : ``torch.FloatTensor``
-        A ``torch.FloatTensor`` of shape (B, *, N)
+    :param vector: ``torch.Tensor``, required.
+        Shape: (B, *, N)
+    :param mask: ``torch.LongTensor``, required.
+        Shape: (B, *, N)
+    :param dim: ``int``
+        The dimension to calculate softmax.
+    :param mask_fill_value: ``float``
+        Replace mask position with this value.
     """
+
     masked_vector = vector.masked_fill((1 - mask).byte(), mask_fill_value)
     result = torch.nn.functional.softmax(masked_vector, dim=dim)
     return result
@@ -46,20 +49,20 @@ def masked_max(vector, mask, dim, keepdim=False, mask_fill_value=-1e32):
     """
     To calculate max along certain dimensions on masked values
 
-    :param
-    vector : ``torch.Tensor``
+    :param vector: ``torch.Tensor``
         The vector to calculate max.
-    mask : ``torch.Tensor``
+    :param mask: ``torch.Tensor``
         The mask of the vector. It must be broadcastable with vector.
-    dim : ``int``
-        The dimension to calculate mean
-    keepdim : ``bool``
-        Whether to keep dimension
-
-
-    :return
-    A ``torch.Tensor`` of including the max values.
+    :param dim: ``int``
+        The dimension to calculate mean.
+    :param keepdim: ``bool``
+        Whether to keep dimension.
+    :param mask_fill_value: ``float``
+        Replace mask position with this value.
+    :return:
+        A ``torch.Tensor`` of including the max values.
     """
+
     one_minus_mask = (1.0 - mask).byte()
     replaced_vector = vector.masked_fill(one_minus_mask, mask_fill_value)
     value_sum, _ = torch.max(replaced_vector, dim=dim, keepdim=keepdim)
@@ -70,19 +73,18 @@ def masked_sum(vector, mask, dim, keepdim=False):
     """
     To calculate sum along certain dimensions on masked values
 
-    :param
-    vector : ``torch.Tensor``
-        The vector to calculate mean.
-    mask : ``torch.Tensor``
+    :param vector: ``torch.Tensor``
+        The vector to calculate sum.
+    :param mask: ``torch.Tensor``
         The mask of the vector. It must be broadcastable with vector.
-    dim : ``int``
-        The dimension to calculate mean
-    keepdim : ``bool``
-        Whether to keep dimension
-
-    :return
-    A ``torch.Tensor`` of including the sum values.
+    :param dim: ``int``
+        The dimension to calculate sum.
+    :param keepdim: ``bool``
+        Whether to keep dimension.
+    :return:
+        A ``torch.Tensor`` of including the sum values.
     """
+
     one_minus_mask = (1.0 - mask).byte()
     replaced_vector = vector.masked_fill(one_minus_mask, 0.0)
     value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
@@ -93,21 +95,20 @@ def masked_mean(vector, mask, dim, keepdim=False, eps=1e-8):
     """
     To calculate mean along certain dimensions on masked values
 
-    :param
-    vector : ``torch.Tensor``
+    :param vector: ``torch.Tensor``
         The vector to calculate mean.
-    mask : ``torch.Tensor``
+    :param mask: ``torch.Tensor``
         The mask of the vector. It must be broadcastable with vector.
-    dim : ``int``
-        The dimension to calculate mean
-    keepdim : ``bool``
-        Whether to keep dimension
-    eps : ``float``
+    :param dim: ``int``
+        The dimension to calculate mean.
+    :param keepdim: ``bool``
+        Whether to keep dimension.
+    :param eps: ``float``
         A small value to avoid zero division problem.
-
-    :return
-    A ``torch.Tensor`` of including the mean values.
+    :return:
+        A ``torch.Tensor`` of including the mean values.
     """
+
     one_minus_mask = (1.0 - mask).byte()
     replaced_vector = vector.masked_fill(one_minus_mask, 0.0)
     value_sum = torch.sum(replaced_vector, dim=dim, keepdim=keepdim)
@@ -115,11 +116,13 @@ def masked_mean(vector, mask, dim, keepdim=False, eps=1e-8):
     return value_sum / value_count.clamp(min=eps)
 
 
-def sequence_cross_entropy_with_logits(logits,
-                                       targets,
-                                       weights,
-                                       average="batch",
-                                       label_smoothing=None):
+def sequence_cross_entropy_with_logits(
+        logits,
+        targets,
+        weights,
+        average="batch",
+        label_smoothing=None
+):
     """
     Computes the cross entropy loss of a sequence, weighted with respect to
     some user provided weights. Note that the weighting here is not the same as
@@ -127,30 +130,29 @@ def sequence_cross_entropy_with_logits(logits,
     classes; here we are weighting the loss contribution from particular elements
     in the sequence. This allows loss computations for models which use padding.
 
-    :param
-    logits : ``torch.FloatTensor``, required.
+    :param logits: ``torch.FloatTensor``, required.
         A ``torch.FloatTensor`` of shape (batch_size, sequence_length, num_classes)
         which contains the unnormalized probability for each class.
-    targets : ``torch.LongTensor``, required.
+    :param targets: ``torch.LongTensor``, required.
         A ``torch.LongTensor`` of size (batch, sequence_length) which contains the
         index of the true class for each corresponding step.
-    weights : ``torch.FloatTensor``, required.
+    :param weights: ``torch.FloatTensor``, required.
         A ``torch.FloatTensor`` of size (batch, sequence_length)
-    average : str, optional (default = "batch")
+    :param average: str, optional (default = "batch")
         If "batch", average the loss across the batches. If "token", average
         the loss across each item in the input. If ``None``, return a vector
         of losses per batch element.
-    label_smoothing : ``float``, optional (default = None)
+    :param label_smoothing: ``float``, optional (default = None)
         Whether or not to apply label smoothing to the cross-entropy loss.
         For example, with a label smoothing value of 0.2, a 4 class classification
         target would look like ``[0.05, 0.05, 0.85, 0.05]`` if the 3rd class was
         the correct label.
-
-    :return
-    A torch.FloatTensor representing the cross entropy loss.
-    If ``average=="batch"`` or ``average=="token"``, the returned loss is a scalar.
-    If ``average is None``, the returned loss is a vector of shape (batch_size,).
+    :return:
+        A torch.FloatTensor representing the cross entropy loss.
+        If ``average=="batch"`` or ``average=="token"``, the returned loss is a scalar.
+        If ``average is None``, the returned loss is a vector of shape (batch_size,).
     """
+
     if average not in {None, "token", "batch"}:
         raise ValueError("Got average f{average}, expected one of "
                          "None, 'token', or 'batch'")

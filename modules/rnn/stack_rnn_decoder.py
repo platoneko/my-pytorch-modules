@@ -66,35 +66,37 @@ class StackGRUDecoder(GRUDecoder):
             encoder_mask=None,
             num_steps=50,
             beam_size=4,
-            per_node_beam_size=4
+            per_node_beam_size=None
     ):
         """
-        Decoder forward using beam search at inference stage
 
-        :param
-        hidden : ``torch.FloatTensor``, required.
-            Initial hidden tensor of shape (num_layers, batch_size, hidden_size)
-        end_index : ``int``, required.
-            Vocab index of <eos> token.
-        encoder_output : ``torch.FloatTensor``, optional (default = None)
-            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        encoder_mask : ``torch.LongTensor``, optional (default = None)
-            A ``torch.LongTensor`` of shape (batch_size, num_rows)
-        beam_size : ``int``, optional (default = 4)
-        per_node_beam_size : ``int``, optional (default = 4)
-
-        :return
-        all_top_k_predictions : ``torch.LongTensor``
+        :param encoder_output: ``torch.FloatTensor``, required.
+            A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size)
+        :param encoder_mask: ``torch.LongTensor``, required.
+            A ``torch.LongTensor`` of shape (batch_size, enc_len)
+        :param num_steps: ``int``, optional (default = 50)
+            Number of decoding steps.
+        :param beam_size: ``int``, optional (default = 4)
+            The width of the beam used.
+        :param per_node_beam_size: ``int``, optional (default = ``beam_size``)
+            The maximum number of candidates to consider per node, at each step in the search.
+            If not given, this just defaults to ``beam_size``. Setting this parameter
+            to a number smaller than ``beam_size`` may give better results, as it can introduce
+            more diversity into the search. See `Beam Search Strategies for Neural Machine Translation.
+            Freitag and Al-Onaizan, 2017 <http://arxiv.org/abs/1702.01806>`.
+        :return:
+            all_top_k_predictions: ``torch.LongTensor``
             A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
             containing k top sequences in descending order along dim 1.
-        log_probabilities : ``torch.FloatTensor``
+            log_probabilities: ``torch.FloatTensor``
             A ``torch.FloatTensor``  of shape (batch_size, beam_size),
-            Log probabilities of k top sequences.
+            Log probabilities of k top sequences.all_top_k_predictions: ``torch.LongTensor``
         """
 
         if self.attention is not None:
             assert encoder_output is not None
-
+        if per_node_beam_size is None:
+            per_node_beam_size = beam_size
         beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
         start_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
 
@@ -200,36 +202,36 @@ class StackLSTMDecoder(LSTMDecoder):
             encoder_mask=None,
             num_steps=50,
             beam_size=4,
-            per_node_beam_size=4,
-            early_stop=False):
+            per_node_beam_size=None):
         """
-        Decoder forward using beam search at inference stage
 
-        :param
-        hidden : ``torch.FloatTensor``, required.
-            Initial hidden tensor of shape (batch_size, hidden_size)
-        end_index : ``int``, required.
-            Vocab index of <eos> token.
-        encoder_output : ``torch.FloatTensor``, optional (default = None)
-            A ``torch.FloatTensor`` of shape (batch_size, num_rows, value_size)
-        encoder_mask : ``torch.LongTensor``, optional (default = None)
-            A ``torch.LongTensor`` of shape (batch_size, num_rows)
-        beam_size : ``int``, optional (default = 4)
-        per_node_beam_size : ``int``, optional (default = 4)
-        early_stop : ``bool``, optional (default = False).
-            If every predicted token from the last step is `self.end_index`, then we can stop early.
-
-        :return
-        all_top_k_predictions : ``torch.LongTensor``
+        :param encoder_output: ``torch.FloatTensor``, required.
+            A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size)
+        :param encoder_mask: ``torch.LongTensor``, required.
+            A ``torch.LongTensor`` of shape (batch_size, enc_len)
+        :param num_steps: ``int``, optional (default = 50)
+            Number of decoding steps.
+        :param beam_size: ``int``, optional (default = 4)
+            The width of the beam used.
+        :param per_node_beam_size: ``int``, optional (default = ``beam_size``)
+            The maximum number of candidates to consider per node, at each step in the search.
+            If not given, this just defaults to ``beam_size``. Setting this parameter
+            to a number smaller than ``beam_size`` may give better results, as it can introduce
+            more diversity into the search. See `Beam Search Strategies for Neural Machine Translation.
+            Freitag and Al-Onaizan, 2017 <http://arxiv.org/abs/1702.01806>`.
+        :return:
+            all_top_k_predictions: ``torch.LongTensor``
             A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
             containing k top sequences in descending order along dim 1.
-        log_probabilities : ``torch.FloatTensor``
+            log_probabilities: ``torch.FloatTensor``
             A ``torch.FloatTensor``  of shape (batch_size, beam_size),
-            Log probabilities of k top sequences.
+            Log probabilities of k top sequences.all_top_k_predictions: ``torch.LongTensor``
         """
+
         if self.attention is not None:
             assert encoder_output is not None
-
+        if per_node_beam_size is None:
+            per_node_beam_size = beam_size
         beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
         start_prediction = hidden.new_full((hidden.size(1),), fill_value=self.start_index).long()
         cell_state = hidden.new_zeros((self.num_layers, hidden.size(1), self.hidden_size))
@@ -242,7 +244,7 @@ class StackLSTMDecoder(LSTMDecoder):
             state['encoder_output'] = encoder_output
             state['encoder_mask'] = encoder_mask
         all_top_k_predictions, log_probabilities = \
-            beam_search.search(start_prediction, state, self._beam_step, early_stop=early_stop)
+            beam_search.search(start_prediction, state, self._beam_step)
         return all_top_k_predictions, log_probabilities
 
     def _beam_step(self, input, state):

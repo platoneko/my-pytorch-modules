@@ -12,41 +12,41 @@ class BeamSearch:
                  beam_size=10,
                  per_node_beam_size=None):
         """
-        :param
-        end_index : ``int``, required.
+
+        :param end_index: ``int``, required.
             The index of the "stop" or "end" token in the target vocabulary.
-        max_steps : ``int``, optional (default = 50)
+        :param max_steps: ``int``, optional (default = 50)
             The maximum number of decoding steps to take, i.e. the maximum length
             of the predicted sequences.
-        beam_size : ``int``, optional (default = 10)
+        :param beam_size: ``int``, optional (default = 10)
             The width of the beam used.
-        per_node_beam_size : ``int``, optional (default = ``beam_size``)
+        :param per_node_beam_size: ``int``, optional (default = ``beam_size``)
             The maximum number of candidates to consider per node, at each step in the search.
             If not given, this just defaults to ``beam_size``. Setting this parameter
             to a number smaller than ``beam_size`` may give better results, as it can introduce
             more diversity into the search. See `Beam Search Strategies for Neural Machine Translation.
             Freitag and Al-Onaizan, 2017 <http://arxiv.org/abs/1702.01806>`.
         """
+
         self.end_index = end_index
         self.max_steps = max_steps
         self.beam_size = beam_size
         self.per_node_beam_size = per_node_beam_size or beam_size
 
-    def search(self, start_predictions, start_state, step, early_stop=False):
+    def search(self, start_predictions, start_state, step):
         """
         Given a starting state and a step function, apply beam search to find the
         most likely target sequences.
 
-        :param
-        start_predictions : ``torch.LongTensor``, required.
+        :param start_predictions: ``torch.LongTensor``, required.
             A tensor containing the initial predictions with shape ``(batch_size,)``.
             Usually the initial predictions are just the index of the "start" token
             in the target vocabulary.
-        start_state : ``Dict(str, torch.Tensor)``, required.
+        :param start_state: ``Dict(str, torch.Tensor)``, required.
             The initial state passed to the ``step`` function. Each value of the state dict
             should be a tensor of shape ``(batch_size, *)``, where ``*`` means any other
             number of dimensions.
-        step : ``callable``, required.
+        :param step: ``callable``, required.
             A function that is responsible for computing the next most likely tokens,
             given the current state and the predictions from the last time step.
             The function should accept two arguments. The first being a tensor
@@ -59,14 +59,11 @@ class BeamSearch:
             the log probabilities of the tokens for the next step, and the second
             element is the updated state. The tensor in the state should have shape
             ``(group_size, *)``, where ``*`` means any other number of dimensions.
-        early_stop : ``bool``, optional (default = False).
-            If every predicted token from the last step is `self.end_index`, then we can stop early.
-
-        :return
-        all_predictions : ``torch.LongTensor``
+        :return:
+            all_predictions: ``torch.LongTensor``
             A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
             containing k top sequences in descending order along dim 1.
-        last_log_probabilities : ``torch.FloatTensor``
+            last_log_probabilities: ``torch.FloatTensor``
             A ``torch.FloatTensor``  of shape (batch_size, beam_size),
             Log probabilities of k top sequences.
         """
@@ -132,7 +129,7 @@ class BeamSearch:
 
             # If every predicted token from the last step is `self.end_index`,
             # then we can stop early.
-            if early_stop and (last_predictions == self.end_index).all():
+            if (last_predictions == self.end_index).all():
                 break
 
             # Take a step. This get the predicted log probs of the next classes

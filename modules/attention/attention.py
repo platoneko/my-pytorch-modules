@@ -3,12 +3,12 @@
     query : ``torch.FloatTensor``, required.
         A ``torch.FloatTensor`` of shape (batch, query_size)
     value : ``torch.FloatTensor``, required.
-        A ``torch.FloatTensor`` of shape (batch, num_rows, value_size)
+        A ``torch.FloatTensor`` of shape (batch, value_len, value_size)
     mask : ``torch.LongTensor``, required.
-        A ``torch.LongTensor`` of shape (batch, num_rows)
+        A ``torch.LongTensor`` of shape (batch, value_len)
 :outputs
     score : ``torch.FloatTensor``
-        Normalized attention score, a ``torch.FloatTensor`` of shape (batch, num_rows)
+        Normalized attention score, a ``torch.FloatTensor`` of shape (batch, value_len)
 """
 
 import torch

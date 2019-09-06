@@ -33,31 +33,37 @@ class TransformerDecoder(nn.Module):
             num_positions=1024,
     ):
         """
-        :param
-        num_heads : ``int``, required.
+
+        :param num_heads: ``int``, required.
             Number of multihead attention heads.
-        num_layers : ``int``, required.
+        :param num_layers: ``int``, required.
             Number of transformer layers.
-        embedding_size : ``int``, required.
+        :param embedding_size: ``int``, required.
             Must be a multiple of n_heads.
-        embedding : ``torch.nn.Embedding``, required.
-            An embedding matrix for the bottom layer of the transformer.
-        ffn_size : ``int``,  required.
+        :param ffn_size: ``int``,  required.
             The size of the hidden layer in the FFN.
-        dropout : ``float``, optional (default = 0.0)
+        :param embedding: ``torch.nn.Embedding``, required.
+            An embedding matrix for the bottom layer of the transformer.
+        :param start_index: ``int``, required.
+            Index of start token.
+        :param end_index: ``int``, required.
+            Index of end token.
+        :param output_layer: ``torch.Modules``, required.
+            Output layer to projecting transformer output to logits.
+        :param dropout: ``float``, optional (default = 0.0)
             Dropout used around embedding and before layer normalizations.
             This is used in Vaswani 2017 and works well on large datasets.
-        attention_dropout : ``float``, optional (default = `dropout`)
+        :param attention_dropout: ``float``, optional (default = `dropout`)
             Dropout performed after the multi-head attention softmax.
-        relu_dropout : ``float``, optional (default = `dropout`)
+        :param relu_dropout: ``float``, optional (default = `dropout`)
             Dropout used after the ReLU in the FFN.
             Not usedin Vaswani 2017, but used in Tensor2Tensor.
-        learn_position_embedding : ``bool``, optional (default = False)
+        :param embedding_scale: ``bool``, optional (default = False)
+            Scale embedding relative to their dimensionality. Found useful in fairseq.
+        :param learn_positional_embedding: ``bool``, optional (default = False)
             If off, sinusoidal embedding are used.
             If on, position embedding are learned from scratch.
-        embedding_scale : ``bool``, optional (default = False)
-            Scale embedding relative to their dimensionality. Found useful in fairseq.
-        num_positions : ``int``, optional (default = 1024)
+        :param num_positions: ``int``, optional (default = 1024)
             Max position of the position embedding matrix.
         """
 
@@ -105,21 +111,22 @@ class TransformerDecoder(nn.Module):
 
     def forward(self, encoder_output, encoder_mask, target=None, num_steps=50, is_training=True):
         """
-        forward
 
-        :param
-        encoder_output : ``torch.FloatTensor``, required.
+        :param encoder_output: ``torch.FloatTensor``, required.
             A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size)
-        encoder_mask : ``torch.LongTensor``, required.
+        :param encoder_mask: ``torch.LongTensor``, required.
             A ``torch.LongTensor`` of shape (batch_size, enc_len)
-        target : ``torch.LongTensor``, optional (default = None)
-            Target tokens tensor of shape (batch_size, seq_len), `target` must contain <sos> and <eos> token.
-        is_training : ``bool``, optional (default = True)
-            If `True`, decode with a fixed, true target sequence.
+        :param target: ``torch.LongTensor``, optional (default = None)
+            Target tokens tensor of shape (batch_size, seq_len), ``target`` must contain start and end token.
+        :param num_steps: ``int``, optional (default = 50)
+            Number of decoding steps.
+        :param is_training: ``bool``, optional (default = True)
+            During training stage(training and validation), we always feed ground truth token to generate next token.
         :return:
-        tensor : ``torch.LongTensor``
-            Return a tensor of shape (batch_size, seq_len),
+            logits: ``torch.FloatTensor``
+            An unnormalized ``torch.FloatTensor`` of shape (batch_size, tgt_len/num_steps, vocab_size)
         """
+
         if is_training:
             assert target is not None
             seq_len = target.size(1)
@@ -167,24 +174,35 @@ class TransformerDecoder(nn.Module):
 
     def beam_forward(
             self, encoder_output, encoder_mask,
-            num_steps=50, beam_size=4,per_node_beam_size=4,
+            num_steps=50, beam_size=4, per_node_beam_size=None,
     ):
         """
-        Decoder forward using beam search at inference stage
 
-        :param
-        beam_size : ``int``, optional (default = 4)
-        per_node_beam_size : ``int``, optional (default = 4)
-
-        :return
-        all_top_k_predictions : ``torch.LongTensor``
+        :param encoder_output: ``torch.FloatTensor``, required.
+            A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size)
+        :param encoder_mask: ``torch.LongTensor``, required.
+            A ``torch.LongTensor`` of shape (batch_size, enc_len)
+        :param num_steps: ``int``, optional (default = 50)
+            Number of decoding steps.
+        :param beam_size: ``int``, optional (default = 4)
+            The width of the beam used.
+        :param per_node_beam_size: ``int``, optional (default = ``beam_size``)
+            The maximum number of candidates to consider per node, at each step in the search.
+            If not given, this just defaults to ``beam_size``. Setting this parameter
+            to a number smaller than ``beam_size`` may give better results, as it can introduce
+            more diversity into the search. See `Beam Search Strategies for Neural Machine Translation.
+            Freitag and Al-Onaizan, 2017 <http://arxiv.org/abs/1702.01806>`.
+        :return:
+            all_top_k_predictions: ``torch.LongTensor``
             A ``torch.LongTensor`` of shape (batch_size, beam_size, num_steps),
             containing k top sequences in descending order along dim 1.
-        log_probabilities : ``torch.FloatTensor``
+            log_probabilities: ``torch.FloatTensor``
             A ``torch.FloatTensor``  of shape (batch_size, beam_size),
             Log probabilities of k top sequences.
         """
 
+        if per_node_beam_size is None:
+            per_node_beam_size = beam_size
         beam_search = BeamSearch(self.end_index, num_steps, beam_size, per_node_beam_size)
         start_prediction = encoder_output.new_full((encoder_output.size(0),), fill_value=self.start_index).long()
 
@@ -248,14 +266,21 @@ class TransformerDecoderLayer(nn.Module):
     def forward(self, input, encoder_output, encoder_mask, is_training):
         """
 
-        :param x: ``torch.FloatTensor``, required.
-         A ``torch.FloatTensor`` of shape (batch_size, seq_len, embedding_size).
+        :param input: ``torch.FloatTensor``, required.
+            A ``torch.FloatTensor`` of shape (batch_size, seq_len, embedding_size).
         :param encoder_output: ``torch.FloatTensor``, required.
-         A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size).
+            A ``torch.FloatTensor`` of shape (batch_size, enc_len, embedding_size).
         :param encoder_mask: ``torch.LongTensor``, required.
-         A ``torch.LongTensor``of shape (batch_size, enc_len).
-        :param is_training: ``bool``
+            A ``torch.LongTensor``of shape (batch_size, enc_len).
+        :param is_training: ``bool``, required.
+            During training stage(training and validation), as we know ground truth target,
+            we can directly compute the whole predict sequence.
+            However, during test stage, we must feed the last prediction token to generate next token,
+            so this module can only compute one next token.
         :return:
+            output: ``torch.FloatTensor``
+            If ``is_training`` is True, the output is of shape (batch_size, tgt_len, embedding_size),
+            Otherwise, the output is of shape (batch_size, 1, embedding_size)
         """
 
         input_norm = self.norm1(input)

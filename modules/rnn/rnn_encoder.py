@@ -51,21 +51,19 @@ class GRUEncoder(nn.Module):
 
     def forward(self, input, hidden=None):
         """
-        forward
 
-        :param
-        input : ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
+        :param input: ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
             Input tensor of shape (batch_size, length), or tuple containing input tensor and length.
-        hidden : ``torch.FloatTensor``
+        :param hidden: ``torch.FloatTensor``, optional (default = None)
             A ``torch.FloatTensor`` of shape (num_layers * num_directions, batch, hidden_size),
             containing the initial hidden state for each element in the batch.
-
-        :return
-        output : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (batch, length, hidden_size * num_directions).
-        last_hidden : : ``torch.FloatTensor``, optional (default = None)
-            A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
+        :return:
+            output: ``torch.FloatTensor``
+            Encoder output of shape (batch, length, hidden_size * num_directions).
+            last_hidden: ``torch.FloatTensor``
+            Last hidden state of shape (num_layers, batch, num_directions * hidden_size).
         """
+
         if isinstance(input, tuple):
             input, length = input
         else:
@@ -146,23 +144,21 @@ class LSTMEncoder(nn.Module):
 
     def forward(self, input, hidden_tuple=None):
         """
-        forward
 
-        :param
-        input : ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
+        :param input: ``torch.LongTensor`` or ``Tuple(torch.LongTensor, torch.LongTensor)``, required.
             Input tensor of shape (batch_size, length), or tuple containing input tensor and length.
-        hidden_tuple : ``Tuple(torch.FloatTensor, torch.FloatTensor)``, optional (default = None)
+        :param hidden_tuple: ``Tuple(torch.FloatTensor, torch.FloatTensor)``, optional (default = None)
             tuple of 2 tensor of shape (num_layers * num_directions, batch, hidden_size),
             containing the initial hidden state and initial cell state for each element in the batch.
-
-        :returns
-        output : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (batch, length, hidden_size * num_directions).
-        last_hidden : : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
-        last_cell_state : ``torch.FloatTensor``
-            A ``torch.FloatTensor`` of shape (num_layers, batch, num_directions * hidden_size).
+        :return:
+            output: ``torch.FloatTensor``
+            Encoder output of shape (batch, length, hidden_size * num_directions).
+            last_hidden: ``torch.FloatTensor``
+            Last hidden state of shape (num_layers, batch, num_directions * hidden_size).
+            last_cell_state: ``torch.FloatTensor``
+            Last cell state of shape (num_layers, batch, num_directions * hidden_size).
         """
+
         if isinstance(input, tuple):
             input, length = input
         else:

@@ -29,37 +29,36 @@ class TransformerEncoder(nn.Module):
             num_positions=1024
     ):
         """
-        :param
-        num_heads : ``int``, required.
+
+        :param num_heads: ``int``, required.
             Number of multihead attention heads.
-        num_layers : ``int``, required.
+        :param num_layers: ``int``, required.
             Number of transformer layers.
-        embedding_size : ``int``, required.
+        :param embedding_size: ``int``, required.
             Must be a multiple of n_heads.
-        embedding : ``torch.nn.Embedding``, required.
+        :param embedding: ``torch.nn.Embedding``, required.
             An embedding matrix for the bottom layer of the transformer.
-        ffn_size : ``int``,  required.
+        :param ffn_size: ``int``,  required.
             The size of the hidden layer in the FFN.
-        padding_index : ``int``, required.
-            Reserved padding index in the embedding matrix.
-        dropout : ``float``, optional (default = 0.0)
+        :param dropout: ``float``, optional (default = 0.0)
             Dropout used around embedding and before layer normalizations.
             This is used in Vaswani 2017 and works well on large datasets.
-        attention_dropout : ``float``, optional (default = `dropout`)
+        :param attention_dropout: ``float``, optional (default = `dropout`)
             Dropout performed after the multi-head attention softmax.
-        relu_dropout : ``float``, optional (default = `dropout`)
+        :param relu_dropout: ``float``, optional (default = `dropout`)
             Dropout used after the ReLU in the FFN.
             Not usedin Vaswani 2017, but used in Tensor2Tensor.
-        learn_position_embedding : ``bool``, optional (default = False)
+        :param learn_position_embedding: ``bool``, optional (default = False)
             If off, sinusoidal embedding are used.
             If on, position embedding are learned from scratch.
-        embedding_scale : ``bool``, optional (default = False)
+        :param embedding_scale: ``bool``, optional (default = False)
             Scale embedding relative to their dimensionality. Found useful in fairseq.
-        reduction : ``bool``, optional (default = False)
+        :param reduction: ``bool``, optional (default = False)
             If true, returns the mean vector for the entire encoding sequence.
-        num_positions : ``int``, optional (default = 1024)
+        :param num_positions: ``int``, optional (default = 1024)
             Max position of the position embedding matrix.
         """
+
         super().__init__()
 
         self.embedding_size = embedding_size
@@ -102,18 +101,17 @@ class TransformerEncoder(nn.Module):
 
     def forward(self, input, mask):
         """
-        forward
 
-        :param
-        input : ``torch.LongTensor``, required.
+        :param input: ``torch.LongTensor``, required.
             Input tokens tensor of shape (batch_size, seq_len).
-
-        :return
-        output : ``torch.FloatTensor``
+        :param mask: ``torch.LongTensor``, required.
+            Mask tensor of shape (batch_size, seq_len).
+        :return:
+            output: ``torch.FloatTensor``.
             A ``torch.FloatTensor`` of shape (batch_size, seq_len, embedding_size).
             If `reduction` is `True`, output is of shape (batch_size, embedding_size).
-
         """
+
         positions = (mask.cumsum(dim=1, dtype=torch.long) - 1).clamp_(min=0)
         tensor = self.embedding(input)
         if self.embedding_scale:
@@ -152,7 +150,7 @@ class TransformerEncoderLayer(nn.Module):
         self.dropout = nn.Dropout(p=dropout)
 
     def forward(self, input, mask):
-        # shape (batch_size, seq_len, embedding_size)
+        # `input` of shape (batch_size, seq_len, embedding_size)
         input_norm = self.norm(input)
         context = self.attention(input_norm, input_norm, input_norm, mask=mask)
         output = self.ffn(self.dropout(context) + input)
